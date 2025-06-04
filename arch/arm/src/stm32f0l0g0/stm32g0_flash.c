@@ -681,6 +681,7 @@ ssize_t up_progmem_eraseblock(size_t block)
 {
   int ret;
   size_t block_address;
+  uint32_t reg;
 
   ret = flash_verify_blocknum(block);
   if (ret < 0)
@@ -722,7 +723,9 @@ ssize_t up_progmem_eraseblock(size_t block)
    * match the correct bank.
    */
 
-  if (block >= flash_bank2_priv.stblock)
+  reg = getreg32(STM32_FLASH_OPTR) & FLASH_OPTR_NSWAP_BANK;
+  if ((block >= flash_bank2_priv.stblock && reg) ||
+      (block < flash_bank2_priv.stblock && !reg))
     {
       modifyreg32(STM32_FLASH_CR, 0, FLASH_CR_BKER);
     }
@@ -889,6 +892,99 @@ exit_with_lock:
 uint8_t up_progmem_erasestate(void)
 {
   return FLASH_ERASEDVALUE;
+}
+
+/****************************************************************************
+ * Name: stm32_flash_optload
+ *
+ * Description:
+ *   Forces the chip to reload the values of the option bytes.  Otherwise,
+ *   they will only be applied the next time a power-on reset occurs.  If
+ *   a change to the option bytes causes a flash bank swap, this will also
+ *   immediately trigger a system reset.
+ *
+ ****************************************************************************/
+
+int stm32_flash_optload(void)
+{
+  int ret;
+  bool was_locked;
+
+  ret = flash_wait_for_operation();
+  if (ret != 0)
+    {
+      return -EBUSY;
+    }
+
+  was_locked = flash_unlock_opt();
+  modifyreg32(STM32_FLASH_SR, 0, FLASH_SR_CLEAR_ERROR_FLAGS);
+
+  ret = flash_wait_for_operation();
+  if (ret != 0)
+    {
+      ret = -EBUSY;
+      goto exit;
+    }
+
+  modifyreg32(STM32_FLASH_CR, 0, FLASH_CR_OBL_LAUNCH);
+
+  while (getreg32(STM32_FLASH_CR) & FLASH_CR_OBL_LAUNCH)
+    {
+    }
+
+exit:
+  if (was_locked)
+    {
+      flash_lock_opt();
+    }
+
+  return ret;
+}
+
+/****************************************************************************
+ * Name: stm32_flash_swapbanks
+ *
+ * Description:
+ *   Swaps banks 1 and 2 in the processor's memory map. Takes effect the next
+ *   time the system is power-on reset, or immediately if stm32_flash_optload
+ *   is called.
+ *
+ * Returned Value:
+ *   Zero or error value
+ *
+ *   -EBUSY: Timeout occurred waiting for previous operation to finish.
+ *   -EPERM: Trying to swap banks with BOOT_LOCK enabled.
+ *
+ * Assumptions:
+ *   This function should only be called for devices that have dual bank
+ *   flash. On single bank devices this function has no effect.
+ *
+ ****************************************************************************/
+
+int stm32_flash_swapbanks(void)
+{
+  int ret = 0;
+#ifdef FLASH_DUAL_BANK
+  uint32_t reg;
+
+  if (getreg32(STM32_FLASH_SECR) & FLASH_SECR_BOOT_LOCK)
+    {
+      return -EPERM;
+    }
+
+  reg = getreg32(STM32_FLASH_OPTR);
+
+  if (reg & FLASH_OPTR_NSWAP_BANK)
+    {
+      ret = stm32_flash_optmodify(FLASH_OPTR_NSWAP_BANK, 0);
+    }
+  else
+    {
+      ret = stm32_flash_optmodify(0, FLASH_OPTR_NSWAP_BANK);
+    }
+#endif
+
+  return ret;
 }
 
 #endif /* CONFIG_ARCH_HAVE_PROGMEM*/
