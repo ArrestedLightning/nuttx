@@ -57,6 +57,10 @@ void stm32_flash_lock(void);
 
 void stm32_flash_unlock(void);
 
+int stm32_flash_swapbanks(void);
+
+int stm32_flash_optload(void);
+
 #undef EXTERN
 #if defined(__cplusplus)
 }
