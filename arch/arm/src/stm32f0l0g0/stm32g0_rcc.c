@@ -202,6 +202,10 @@ static inline void rcc_enableapb1(void)
 #endif
 #endif
 
+#ifdef CONFIG_STM32F0L0G0_USB
+  regval |= RCC_APB1ENR_USBEN;
+#endif
+
 #ifdef CONFIG_STM32F0L0G0_SPI2
   /* SPI 2 clock enable */
 
@@ -246,6 +250,15 @@ static inline void rcc_enableapb1(void)
 #ifdef CONFIG_STM32F0L0G0_FORCEPOWER
   regval |= RCC_APB1ENR_I2C1EN;
 #endif
+#endif
+
+#ifdef STM32_USE_HSI48
+  /* Clock recovery system clock enable */
+
+  if (STM32_HSI48_SYNCSRC != SYNCSRC_NONE)
+    {
+      regval |= RCC_APB1ENR_CRSEN;
+    }
 #endif
 
 #ifdef CONFIG_STM32F0L0G0_I2C2
@@ -687,6 +700,12 @@ static inline void rcc_enableperipherals(void)
   rcc_enableahb();
   rcc_enableapb2();
   rcc_enableapb1();
+
+#ifdef STM32_USE_HSI48
+  /* Enable HSI48 clocking to support USB transfers or RNG */
+
+  stm32_enable_hsi48(STM32_HSI48_SYNCSRC);
+#endif
 }
 
 /****************************************************************************

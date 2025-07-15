@@ -33,9 +33,9 @@ ifeq ($(CONFIG_STM32F0L0G0_DMA),y)
 CHIP_CSRCS += stm32_dma.c
 endif
 
-ifeq ($(CONFIG_STM32F0L0G0_PWR),y)
+#ifeq ($(CONFIG_STM32F0L0G0_PWR),y)
 CHIP_CSRCS += stm32_pwr.c
-endif
+#endif
 
 ifneq ($(CONFIG_ARCH_IDLE_CUSTOM),y)
 CHIP_CSRCS += stm32_idle.c
@@ -66,7 +66,7 @@ CHIP_CSRCS += stm32_hsi48.c
 endif
 
 ifeq ($(CONFIG_STM32F0L0G0_USB),y)
-CHIP_CSRCS += stm32_usbdev.c
+CHIP_CSRCS += stm32g0_usbfs.c
 endif
 
 ifeq ($(CONFIG_STM32F0L0G0_I2C),y)

@@ -218,6 +218,7 @@ void stm32_pwr_disablepvd(void);
 
 #endif /* CONFIG_STM32F0L0G0_ENERGYLITE */
 
+
 #undef EXTERN
 #if defined(__cplusplus)
 }
@@ -225,4 +226,21 @@ void stm32_pwr_disablepvd(void);
 
 #endif /* __ASSEMBLY__ */
 #endif /* CONFIG_STM32F0L0G0_PWR */
+#if defined(CONFIG_STM32F0L0G0_STM32G0)
+
+/****************************************************************************
+ * Name: stm32_pwr_enableusv
+ *
+ * Description:
+ *   Enables or disables the USB Supply.  Setting this bit
+ *   is mandatory to use the USB OTG FS peripheral.
+ *
+ * Input Parameters:
+ *   set - True: Vddusb is enabled; False: Vddusb is disabled.
+ *
+ ****************************************************************************/
+
+void stm32_pwr_enableusv(bool set);
+
+#endif /* CONFIG_STM32F0L0G0_STM32G0 */
 #endif /* __ARCH_ARM_SRC_STM32F0L0G0_STM32_PWR_H */
