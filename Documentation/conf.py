@@ -61,6 +61,7 @@ extensions = [
     "warnings_filter",
     "sphinx_tags",
     "sphinx_design",
+    "sphinx_collapse",
 ]
 
 source_suffix = [".rst", ".md"]
@@ -85,8 +86,6 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "legacy_README.md", "ven
 # overridden by command line option but we can provide a sane default
 # this way
 
-html_context = dict()
-html_context["nuttx_versions"] = "latest"
 
 # TODO: append other options using releases detected from git (or maybe just
 # a few hand-selected ones, or maybe just a "stable" option)
@@ -101,6 +100,15 @@ html_theme = "sphinx_rtd_theme"
 html_show_sphinx = False
 
 html_theme_options = {"navigation_depth": 5}
+
+html_context = {
+    "display_github": True,
+    "github_user": "apache",
+    "github_repo": "nuttx",
+    "github_version": "master",
+    "conf_py_path": "/Documentation/",
+    "nuttx_versions": "latest",
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

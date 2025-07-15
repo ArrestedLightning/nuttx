@@ -794,6 +794,11 @@ config ESP32_TWAI0
 config ESP32_AES_ACCELERATOR
 	bool "AES Accelerator"
 	default n
+config ESP32_SHA_ACCELERATOR
+	bool "SHA Accelerator"
+	default n
+	---help---
+		Enable ESP32 SHA accelerator support.
 
 config ESP32_PID
 	bool "PID Controller"
@@ -2756,6 +2761,7 @@ config ESP32_APP_FORMAT_LEGACY
 config ESP32_APP_FORMAT_MCUBOOT
 	bool "Enable MCUboot-bootable format"
 	depends on !MCUBOOT_BOOTLOADER
+	select ESPRESSIF_BOOTLOADER_MCUBOOT
 	default n
 	select ESP32_HAVE_OTA_PARTITION
 	---help---

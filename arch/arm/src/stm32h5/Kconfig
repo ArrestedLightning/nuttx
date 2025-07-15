@@ -881,6 +881,169 @@ config ARCH_BOARD_STM32H5_CUSTOM_CLOCKCONFIG
 	---help---
 		Enables special, board-specific STM32 clock configuration.
 
+menu "ADC Configuration"
+	depends on STM32H5_ADC
+
+config STM32H5_ADC_MAX_SAMPLES
+	int "The maximum number of channels that can be sampled"
+	default 16
+	---help---
+		The maximum number of samples which can be handled without
+		overrun depends on various factors. This is the user's
+		responsibility to correctly select this value.
+		Since the interface to update the sampling time is available
+		for all supported devices, the user can change the default
+		values in the board initialization logic and avoid ADC overrun.
+
+config STM32H5_ADC1_RESOLUTION
+	int "ADC1 resolution"
+	depends on STM32H5_ADC1
+	default 0
+	range 0 3
+	---help---
+		ADC1 resolution. 0 - 12 bit, 1 - 10 bit, 2 - 8 bit, 3 - 6 bit
+
+config STM32H5_ADC1_DMA
+	bool "ADC1 DMA Enable"
+	depends on STM32H5_ADC1 && STM32H5_DMA
+	default n
+	---help---
+		If DMA is selected, then the ADC may be configured to support DMA
+		transfer, which is necessary if multiple channels are read or if
+		very high trigger frequencies are used.
+
+config STM32H5_ADC1_DMA_BATCH
+	int "ADC1 DMA number of conversions"
+	depends on STM32H5_ADC1 && STM32H5_ADC1_DMA
+	default 1
+	---help---
+		This option allows you to select the number of regular group conversions
+		that will trigger a DMA callback transerring data to the upper-half driver.
+		By default, this value is 1, which means that data is transferred after
+		each group conversion.
+
+config STM32H5_ADC1_DMA_CFG
+	bool "ADC1 DMA configuration"
+	depends on STM32H5_ADC1 && STM32H5_ADC1_DMA
+	default n
+	---help---
+		0 - ADC1 DMA in One Shot Mode, 1 - ADC1 DMA in Circular Mode
+
+config STM32H5_ADC1_OVERSAMPLE
+	bool "Enable ADC1 hardware oversampling support"
+	depends on STM32H5_ADC1
+	default n
+	---help---
+		Enable the on-chip ADC oversampling/accumulation block (CFGR2.OVSE).
+		Only STM32G0 and STM32L0 series include this hardware block.
+
+if STM32H5_ADC1_OVERSAMPLE
+
+config STM32H5_ADC1_TROVS
+	bool "Enable triggered oversampling (CFGR2.TROVS)"
+	default n
+	---help---
+		If set, oversampling will only occur when a trigger event occurs.
+		If not set, oversampling occurs continuously (TOVS=0).
+
+config STM32H5_ADC1_OVSR
+	int "Oversampling ratio (CFGR2.OVSR)"
+	default 0
+	range 0 7
+	---help---
+		Sets the oversampling ratio as 2^(OVSR+1). For example:
+		0 -> 2×
+		1 -> 4×
+		2 -> 8×
+		...
+		7 -> 256×
+
+config STM32H5_ADC1_OVSS
+	int "Oversampling right-shift bits (CFGR2.OVSS)"
+	default 0
+	range 0 8
+	---help---
+		Sets how many bits the accumulated result is right-shifted.
+		Max of 8-bits.
+
+endif # STM32H5_ADC1_OVERSAMPLE
+
+config STM32H5_ADC2_RESOLUTION
+	int "ADC2 resolution"
+	depends on STM32H5_ADC2
+	default 0
+	range 0 3
+	---help---
+		ADC1 resolution. 0 - 12 bit, 1 - 10 bit, 2 - 8 bit, 3 - 6 bit
+
+config STM32H5_ADC2_DMA
+	bool "ADC2 DMA Enable"
+	depends on STM32H5_ADC2 && STM32H5_DMA
+	default n
+	---help---
+		If DMA is selected, then the ADC may be configured to support DMA
+		transfer, which is necessary if multiple channels are read or if
+		very high trigger frequencies are used.
+
+config STM32H5_ADC2_DMA_BATCH
+	int "ADC2 DMA number of conversions"
+	depends on STM32H5_ADC2 && STM32H5_ADC2_DMA
+	default 1
+	---help---
+		This option allows you to select the number of regular group conversions
+		that will trigger a DMA callback transerring data to the upper-half driver.
+		By default, this value is 1, which means that data is transferred after
+		each group conversion.
+
+config STM32H5_ADC2_DMA_CFG
+	int "ADC2 DMA configuration"
+	depends on STM32H5_ADC2_DMA && STM32H5_DMA
+	range 0 1
+	default 0
+	---help---
+		0 - ADC2 DMA in One Shot Mode, 1 - ADC2 DMA in Circular Mode
+
+config STM32H5_ADC2_OVERSAMPLE
+	bool "Enable ADC2 hardware oversampling support"
+	depends on STM32H5_ADC2
+	default n
+	---help---
+		Enable the on-chip ADC oversampling/accumulation block (CFGR2.OVSE).
+		Only STM32G0 and STM32L0 series include this hardware block.
+
+if STM32H5_ADC2_OVERSAMPLE
+
+config STM32H5_ADC2_TROVS
+	bool "Enable triggered oversampling (CFGR2.TROVS)"
+	default n
+	---help---
+		If set, oversampling will only occur when a trigger event occurs.
+		If not set, oversampling occurs continuously (TOVS=0).
+
+config STM32H5_ADC2_OVSR
+	int "Oversampling ratio (CFGR2.OVSR)"
+	default 0
+	range 0 7
+	---help---
+		Sets the oversampling ratio as 2^(OVSR+1). For example:
+		0 -> 2×
+		1 -> 4×
+		2 -> 8×
+		...
+		7 -> 256×
+
+config STM32H5_ADC2_OVSS
+	int "Oversampling right-shift bits (CFGR2.OVSS)"
+	default 0
+	range 0 8
+	---help---
+		Sets how many bits the accumulated result is right-shifted.
+		Max of 8-bits.
+
+endif # STM32H5_ADC2_OVERSAMPLE
+
+endmenu # ADC Configuration
+
 menu "SPI Configuration"
 	depends on STM32H5_SPI
 
@@ -4827,7 +4990,7 @@ choice
 config STM32H5_FDCAN1_CLASSIC
 	bool "Classic CAN"
 	---help---
-		Enable Clasic CAN mode
+		Enable Classic CAN mode
 
 config STM32H5_FDCAN1_FD
 	bool "CAN FD"
@@ -4954,7 +5117,7 @@ choice
 config STM32H5_FDCAN2_CLASSIC
 	bool "Classic CAN"
 	---help---
-		Enable Clasic CAN mode
+		Enable Classic CAN mode
 
 config STM32H5_FDCAN2_FD
 	bool "CAN FD"

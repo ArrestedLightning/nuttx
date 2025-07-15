@@ -195,6 +195,24 @@ disables the NuttShell to get the best possible score.
 .. note:: As the NSH is disabled, the application will start as soon as the
   system is turned on.
 
+crypto
+------
+
+This configuration enables support for the cryptographic hardware and
+the ``/dev/crypto`` device file. Currently, we are supporting SHA-1,
+SHA-224 and SHA-256 algorithms using hardware.
+To test hardware acceleration, you can use `hmac` example and following output
+should look like this::
+
+    nsh> hmac
+    ...
+    hmac sha1 success
+    hmac sha1 success
+    hmac sha1 success
+    hmac sha256 success
+    hmac sha256 success
+    hmac sha256 success
+
 cxx
 ---
 Development environment ready for C++ applications. You can check if the setup
@@ -256,6 +274,41 @@ interrupt fires::
 
 The pin is configured to trigger an interrupt on the rising edge, so after
 issuing the above command, connect it to 3.3V.
+
+To use dedicated gpio for controlling multiple gpio pin at the same time
+or having better response time, you need to enable
+`CONFIG_ESPRESSIF_DEDICATED_GPIO` option. Dedicated GPIO is suitable
+for faster response times required applications like simulate serial/parallel
+interfaces in a bit-banging way.
+After this option enabled GPIO4 and GPIO5 pins are ready to used as dedicated GPIO pins
+as input/output mode. These pins are for example, you can use any pin up to 8 pins for
+input and 8 pins for output for dedicated gpio.
+To write and read data from dedicated gpio, you need to use
+`write` and `read` calls.
+
+The following snippet demonstrates how to read/write to dedicated GPIO pins:
+
+.. code-block:: C
+
+    int fd; = open("/dev/dedic_gpio0", O_RDWR);
+    int rd_val = 0;
+    int wr_mask = 0xffff;
+    int wr_val = 3;
+
+    while(1)
+      {
+        write(fd, &wr_val, wr_mask);
+        if (wr_val == 0)
+          {
+            wr_val = 3;
+          }
+        else
+          {
+            wr_val = 0;
+          }
+        read(fd, &rd_val, sizeof(uint32_t));
+        printf("rd_val: %d", rd_val);
+      }
 
 i2c
 ---
@@ -718,6 +771,39 @@ Format and mount the SD/MMC device with following commands::
 FAT filesystem is enabled in the default configuration. Other filesystems may
 also work.
 
+sdmmc_spi
+---------
+
+This configuration is used to mount a FAT/FAT32 SD Card into the OS' filesystem.
+It uses SPI to communicate with the SD Card, defaulting to SPI2.
+
+The SD slot number, SPI port number and minor number can be modified in ``Application Configuration → NSH Library``.
+
+To access the card's files, make sure ``/dev/mmcsd0`` exists and then execute the following commands::
+
+    nsh> ls /dev
+    /dev:
+    console
+    mmcsd0
+    null
+    ttyS0
+    zero
+    nsh> mount -t vfat /dev/mmcsd0 /mnt
+
+This will mount the SD Card to ``/mnt``. Now, you can use the SD Card as a normal filesystem.
+For example, you can read a file and write to it::
+
+    nsh> ls /mnt
+    /mnt:
+    hello.txt
+    nsh> cat /mnt/hello.txt
+    Hello World
+    nsh> echo 'NuttX RTOS' >> /mnt/hello.txt
+    nsh> cat /mnt/hello.txt
+    Hello World!
+    NuttX RTOS
+    nsh>
+
 smp
 ---
 
@@ -1003,8 +1089,8 @@ To test it, just run the following::
 fastboot
 --------
 
-The basic Fastboot configuration is based on esp32s3-devkit:usb_device.
-More details about usage of fastboot, please refer to `fastbootd — NuttX latest documentation <https://nuttx.apache.org/docs/latest/applications/system/fastboot/index.html>`_.
+| The Fastboot configuration is based on esp32s3-devkit:usb_device and esp32s3-devkit:wifi, and support both **USB** and **TCP** network transport.
+| More details about usage of fastboot, please refer to `fastbootd — NuttX latest documentation <https://nuttx.apache.org/docs/latest/applications/system/fastboot/index.html>`_.
 
 You can run the configuration and compilation procedure::
 
@@ -1017,14 +1103,36 @@ To test it, just run the following (**Default is host side**):
 
     sudo apt install fastboot
 
-2. List devices running fastboot::
+2. Specify a device / List devices:
+
+  List devices only supported for USB transport::
 
     fastboot devices
 
-  Example::
+    # Examples
 
     $ fastboot devices
     1234    fastboot
+
+  To specific a device, use "-s" option::
+
+    # Usage
+    #
+    #   -s tcp:HOST[:PORT]         Specify a TCP network device.
+    #   -s SERIAL                  Specify a USB device.
+
+    fastboot -s SERIAL COMMAND
+    fastboot -s tcp:HOST[:PORT] COMMAND
+
+    # Examples
+
+    $ fastboot -s 1234 oem shell ifconfig
+    wlan0   Link encap:Ethernet HWaddr a0:85:e3:f4:43:30 at RUNNING mtu 1500
+            inet addr:192.168.211.111 DRaddr:192.168.211.107 Mask:255.255.255.0
+
+    PS C:\workspace> fastboot.exe -s tcp:192.168.211.111 oem shell ifconfig
+    wlan0   Link encap:Ethernet HWaddr a0:85:e3:f4:43:30 at RUNNING mtu 1500
+            inet addr:192.168.211.111 DRaddr:192.168.211.107 Mask:255.255.255.0
 
 3. Display given variable::
 
@@ -1082,3 +1190,45 @@ To test it, just run the following (**Default is host side**):
     0050: 44 ff c9 3b 55 51 93 b3 fb 1e 88 9e e9 2d 69 36 D..;UQ.......-i6
     0060: 10 d0 70 27 92 91 32 25 f5 cc 1f 59 ea 39 31 24 ..p'..2%...Y.91$
     0070: 3f 2e b0 fe ef 87 df 9b d4 7d 79 2e de 64 f6 ed ?........}y..d..
+
+fastboot_usb
+------------
+
+| The basic Fastboot configuration is based on esp32s3-devkit:usb_device and support **USB** transport only.
+| More details about usage of fastboot, please refer to `fastbootd — NuttX latest documentation <https://nuttx.apache.org/docs/latest/applications/system/fastboot/index.html>`_.
+
+You can run the configuration and compilation procedure::
+
+  $ ./tools/configure.sh -l lckfb-szpi-esp32s3:fastboot_usb
+  $ make flash ESPTOOL_PORT=/dev/ttyACMx -j
+
+fastboot_tcp
+------------
+
+| The basic Fastboot configuration is based on esp32s3-devkit:wifi and support **TCP** transport only.
+| More details about usage of fastboot, please refer to `fastbootd — NuttX latest documentation <https://nuttx.apache.org/docs/latest/applications/system/fastboot/index.html>`_.
+
+You can run the configuration and compilation procedure::
+
+    $ ./tools/configure.sh -l esp32s3-devkit:fastboot_tcp
+    $ make flash ESPTOOL_PORT=/dev/ttyACMx -j
+
+To test it, just run the following::
+
+    # Device side
+
+    nsh> wapi psk wlan0 mypasswd 3
+    nsh> wapi essid wlan0 myssid 1
+    nsh> renew wlan0
+
+    # Host side
+
+    PS C:\workspace> fastboot.exe -s tcp:HOST[:PORT] oem shell ls
+    /:
+     data/
+     dev/
+     etc/
+     proc/
+     var/
+    OKAY [  0.063s]
+    Finished. Total time: 0.064s

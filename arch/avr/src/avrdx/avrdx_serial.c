@@ -184,7 +184,7 @@ static const IOBJ uint8_t avrdx_usart_dre_interrupts[] =
 
 /* USARTn operations - common for all ports */
 
-static struct uart_ops_s g_usart_ops =
+static const struct uart_ops_s g_usart_ops =
 {
   .setup          = avrdx_usart_setup,
   .shutdown       = avrdx_usart_shutdown,
@@ -607,7 +607,7 @@ static bool avrdx_usart_txempty(struct uart_dev_s *dev)
  * Name: avrdx_initialize_port
  *
  * Description:
- *   DRY method for USARTn initialization. Allocated data structures
+ *   DRY method for USARTn initialization. Allocates data structures
  *   for USARTn peripheral and assigns into g_usart_ports array
  *
  * Input Parameters:

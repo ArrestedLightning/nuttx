@@ -1625,7 +1625,7 @@ static void *malloc_wrapper(size_t size)
  *   Malloc buffer in DRAM
  *
  * Input Parameters:
- *  szie - buffer size
+ *  size - buffer size
  *
  * Returned Value:
  *   None
@@ -2905,7 +2905,7 @@ int esp32_bt_controller_init(void)
     }
 
   /* Initialize list of interrupt flags to enable chained critical sections
-   * to return sucessfully.
+   * to return successfully.
    */
 
   sq_init(&g_ble_int_flags_free);
@@ -3179,7 +3179,7 @@ int esp32_bt_controller_enable(esp_bt_mode_t mode)
 
   sdk_config_set_bt_pll_track_enable(true);
 
-  /* inititalize bluetooth baseband */
+  /* initialize bluetooth baseband */
 
   btdm_check_and_init_bb();
 
@@ -3262,7 +3262,7 @@ int esp32_bt_controller_disable(void)
 }
 
 /****************************************************************************
- * Name: esp32_bt_controller_get_status
+ * Name: esp_bt_controller_get_status
  *
  * Description:
  *   Returns the status of the BT Controller
@@ -3275,7 +3275,7 @@ int esp32_bt_controller_disable(void)
  *
  ****************************************************************************/
 
-esp_bt_controller_status_t esp32_bt_controller_get_status(void)
+esp_bt_controller_status_t esp_bt_controller_get_status(void)
 {
   return g_btdm_controller_status;
 }

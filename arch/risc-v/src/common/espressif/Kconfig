@@ -261,6 +261,10 @@ config ESPRESSIF_UART
 	bool
 	default n
 
+config ESPRESSIF_LP_UART
+	bool
+	default n
+
 config ESPRESSIF_UART0
 	bool "UART0"
 	default y
@@ -273,6 +277,15 @@ config ESPRESSIF_UART1
 	default n
 	select ESPRESSIF_UART
 	select UART1_SERIALDRIVER
+	select ARCH_HAVE_SERIAL_TERMIOS
+
+config ESPRESSIF_LP_UART0
+	bool "LP UART0"
+	default n
+	depends on ARCH_CHIP_ESP32C6
+	select ESPRESSIF_UART
+	select ESPRESSIF_LP_UART
+	select LPUART0_SERIALDRIVER
 	select ARCH_HAVE_SERIAL_TERMIOS
 
 config ESPRESSIF_TWAI
@@ -303,6 +316,16 @@ config ESPRESSIF_USBSERIAL
 	select OTHER_UART_SERIALDRIVER
 	select ARCH_HAVE_SERIAL_TERMIOS
 
+config ESPRESSIF_DEDICATED_GPIO
+	bool "Dedicated GPIO"
+	default n
+	---help---
+		Enable dedicated GPIO support for faster response time.
+		Dedicated GPIO is suitable for faster response times required
+		applications like simulate serial/parallel interfaces in a bit-banging way.
+		It can work as pin grouping and you can use any pin up to 8 pins for
+		input and 8 pins for output for dedicated gpio in total.
+
 config ESPRESSIF_GPIO_IRQ
 	bool "GPIO pin interrupts"
 	default n
@@ -321,6 +344,12 @@ config ESPRESSIF_LEDC
 	default n
 	select PWM
 	select ARCH_HAVE_PWM_MULTICHAN
+
+config ESPRESSIF_SHA_ACCELERATOR
+	bool "SHA Accelerator"
+	default n
+	---help---
+		Enable SHA accelerator support.
 
 config ESPRESSIF_ADC
 	bool "Analog-to-digital converter (ADC)"
@@ -355,6 +384,10 @@ config ESPRESSIF_I2C
 	bool
 	default n
 
+config ESPRESSIF_LPI2C
+	bool
+	default n
+
 config ESPRESSIF_I2C_PERIPH_MASTER_MODE
 	bool
 	depends on (ESPRESSIF_I2C0_MASTER_MODE || ESPRESSIF_I2C1_MASTER_MODE)
@@ -376,6 +409,14 @@ config ESPRESSIF_I2C1
 	default n
 	depends on ARCH_CHIP_ESP32H2
 	select ESPRESSIF_I2C
+	select I2C
+
+config ESPRESSIF_LP_I2C0
+	bool "LP I2C 0"
+	default n
+	depends on ARCH_CHIP_ESP32C6
+	select ESPRESSIF_I2C
+	select ESPRESSIF_LPI2C
 	select I2C
 
 choice ESPRESSIF_I2C0_MODE
@@ -644,6 +685,8 @@ config ESP_PCNT_TEST_MODE
 config ESP_PCNT_AS_QE
 	bool
 	default n
+	select SENSORS
+	select SENSORS_QENCODER
 
 config ESP_PCNT_U0
 	bool "Enable PCNT Unit 0"
@@ -663,15 +706,15 @@ config ESP_PCNT_U0_CH0_EDGE_PIN
 
 config ESP_PCNT_U0_CH0_LEVEL_PIN
 	int "PCNT_U0 CH0 Level/Control Pin Number"
-	default 4 if !ESP_PCNT_U0_QE
-	default -1 if ESP_PCNT_U0_QE
+	default 4
 	range -1 39
+	depends on !ESP_PCNT_U0_QE
 
 config ESP_PCNT_U0_CH1_EDGE_PIN
 	int "PCNT_U0 CH1 Edge/Pulse Pin Number"
-	default 0 if !ESP_PCNT_U0_QE
-	default -1 if ESP_PCNT_U0_QE
+	default 0
 	range -1 39
+	depends on !ESP_PCNT_U0_QE
 
 config ESP_PCNT_U0_CH1_LEVEL_PIN
 	int "PCNT_U0 CH1 Level/Control Pin Number"
@@ -1005,6 +1048,12 @@ config ESPRESSIF_WIFI_ENABLE_SAE_PK
 	default y
 	---help---
 		Select this option to enable SAE-PK
+
+config ESPRESSIF_WIFI_ENABLE_SAE_H2E
+	bool "Enable SAE-H2E"
+	default y
+	---help---
+		Select this option to enable SAE-H2E
 
 config ESPRESSIF_WIFI_SOFTAP_SAE_SUPPORT
 	bool "Enable WPA3 Personal(SAE) SoftAP"
@@ -2004,7 +2053,8 @@ if ESPRESSIF_I2C0
 
 config ESPRESSIF_I2C0_SCLPIN
 	int "I2C0 SCL Pin"
-	default 6
+	default 6 if !ESPRESSIF_LPI2C
+	default 23 if ESPRESSIF_LPI2C
 	range 0 21
 
 config ESPRESSIF_I2C0_SDAPIN

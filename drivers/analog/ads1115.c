@@ -352,10 +352,10 @@ static int cmdbyte_init(FAR struct ads1115_dev_s *priv)
  *   reading is stored.
  *
  * NOTE:
- *   When switching between channels in continous mode, old data may be read.
- *   Using the ALERT/RDY pin can avoid this.
+ *   When switching between channels in continuous mode, old data may be
+ *   read.  Using the ALERT/RDY pin can avoid this.
  *
- *   Each channel corrseponds to a differing mux configuration as defined in
+ *   Each channel corresponds to a differing mux configuration as defined in
  *   the datasheet.
  *
  *   msg->am_channel  MUX Configuration
@@ -423,7 +423,7 @@ static int ads1115_readchannel(FAR struct ads1115_dev_s *priv,
             {
               /* ADS1115 takes ~25 usec to wake up */
 
-              nxsig_usleep(25);
+              up_udelay(4000);
               ret = ads1115_read_current_register(priv, &buf);
               count++;
             }

@@ -278,7 +278,7 @@
 
 #  define nosanitize_address __attribute__((no_sanitize_address))
 
-/* the Greenhills compiler do not support the following atttributes */
+/* the Greenhills compiler do not support the following attributes */
 
 #  if defined(__ghs__)
 #    undef nooptimiziation_function
@@ -349,7 +349,7 @@
 #  define used_code __attribute__((used))
 #  define used_data __attribute__((used))
 
-/* The allocation function annonations */
+/* The allocation function annotations */
 
 #  if __GNUC__ >= 11
 #    define fopen_like __attribute__((__malloc__(fclose, 1)))
@@ -576,7 +576,9 @@
 
 /* Indicate that a local variable is not used */
 
-#  define UNUSED(a) ((void)(1 || &(a)))
+#  ifndef UNUSED
+#    define UNUSED(a) ((void)(1 || &(a)))
+#  endif
 
 #  if defined(__clang__)
 #    define no_builtin(n) __attribute__((no_builtin(n)))
@@ -586,7 +588,7 @@
 #    define no_builtin(n)
 #  endif
 
-/* CMSE extention */
+/* CMSE extension */
 
 #  ifdef CONFIG_ARCH_HAVE_TRUSTZONE
 #    define tz_nonsecure_entry __attribute__((cmse_nonsecure_entry))
@@ -708,7 +710,9 @@
 
 /* Indicate that a local variable is not used */
 
-#  define UNUSED(a) ((void)(1 || &(a)))
+#  ifndef UNUSED
+#    define UNUSED(a) ((void)(1 || &(a)))
+#  endif
 
 /* It is assumed that the system is build using the small
  * data model with storage defaulting to internal RAM.
@@ -901,7 +905,9 @@
 
 /* Indicate that a local variable is not used */
 
-#  define UNUSED(a) ((void)(1 || &(a)))
+#  ifndef UNUSED
+#    define UNUSED(a) ((void)(1 || &(a)))
+#  endif
 
 /* Older Zilog compilers support both types double and long long, but the
  * size is 32-bits (same as long and single precision) so it is safer to say
@@ -992,7 +998,9 @@
 
 /* Indicate that a local variable is not used */
 
-#  define UNUSED(a) ((void)(1 || &(a)))
+#  ifndef UNUSED
+#    define UNUSED(a) ((void)(1 || &(a)))
+#  endif
 
 #  define CONFIG_CPP_HAVE_VARARGS 1 /* Supports variable argument macros */
 #  define CONFIG_HAVE_FILENAME 1    /* Has __FILE__ */
@@ -1088,7 +1096,9 @@
 #  undef  CONFIG_LONG_IS_NOT_INT
 #  undef  CONFIG_PTR_IS_NOT_INT
 
-#  define UNUSED(a) ((void)(1 || &(a)))
+#  ifndef UNUSED
+#    define UNUSED(a) ((void)(1 || &(a)))
+#  endif
 
 #  define offsetof(a, b) ((size_t)(&(((a *)(0))->b)))
 #  define return_address(x) 0
@@ -1179,7 +1189,9 @@
 #  undef  CONFIG_LONG_IS_NOT_INT
 #  undef  CONFIG_PTR_IS_NOT_INT
 
-#  define UNUSED(a) ((void)(1 || &(a)))
+#  ifndef UNUSED
+#    define UNUSED(a) ((void)(1 || &(a)))
+#  endif
 
 #  define offsetof(a, b) ((size_t)(&(((a *)(0))->b)))
 #  define return_address(x) 0
@@ -1261,7 +1273,9 @@
 #  undef  CONFIG_HAVE_DOUBLE
 #  undef  CONFIG_HAVE_LONG_DOUBLE
 
-#  define UNUSED(a) ((void)(1 || &(a)))
+#  ifndef UNUSED
+#    define UNUSED(a) ((void)(1 || &(a)))
+#  endif
 
 #  define offsetof(a, b) ((size_t)(&(((a *)(0))->b)))
 #  define return_address(x) 0

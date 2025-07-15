@@ -36,6 +36,9 @@
 #define PORT_LPUART4_RX PORT_CFG(1, 8, PORT_PCR_MUX_ALT2 | PORT_PCR_IBE)
 #define PORT_LPUART4_TX PORT_CFG(1, 9, PORT_PCR_MUX_ALT2 | PORT_PCR_IBE)
 
+#define PORT_LPI2C0_SCL PORT_CFG(4, 1, PORT_PCR_MUX_ALT2 | PORT_PCR_IBE)
+#define PORT_LPI2C0_SDA PORT_CFG(4, 0, PORT_PCR_MUX_ALT2 | PORT_PCR_IBE)
+
 /****************************************************************************
  * Public Data
  ****************************************************************************/

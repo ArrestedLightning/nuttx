@@ -1228,8 +1228,8 @@ Structures
    defining a structure within a type definition is discouraged. It is
    preferred that the structure definition and the type definition be
    separate definitions. In general, the NuttX coding style discourages
-   any ``typdef``-ing of structures; normally the full structure name is
-   used as types throughout the code. The reason for this is that is
+   any ``typedef``-ing of structures; normally the full structure name
+   is used as types throughout the code. The reason for this is that is
    structure pointers may be forward referenced in header files without
    having to include the file the provides the type definition. This
    greatly reduces header file coupling.
@@ -1481,7 +1481,7 @@ the naming of `enumeration values <#enumerations>`__.
 -  **Uppercase**. Macro names are always in upper case.
 -  **Lowercase Exceptions**. There are a few lower case values in NuttX
    macro names. Such as a lower-case ``p`` for a period or decimal point
-   (such as ``VOLTAGE_3p3V``). I have also used lower-case ``v`` for a
+   (such as ``VOLTAGE_3p3V``). The lower-case ``v`` is also used for a
    version number (such as ``CONFIG_NET_IPv6``). However, these are
    exceptions to the rule rather than illustrating a rule.
 -  **Macros that could be functions**. Lower-case macro names are also

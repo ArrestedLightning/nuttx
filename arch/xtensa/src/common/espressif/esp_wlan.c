@@ -202,6 +202,42 @@ struct wlan_priv_s
 };
 
 /****************************************************************************
+ * Public Data
+ ****************************************************************************/
+
+#ifdef ESPRESSIF_WLAN_HAS_STA
+
+/* If reconnect automatically */
+
+volatile bool g_sta_reconnect;
+
+/* If Wi-Fi sta starts */
+
+volatile bool g_sta_started;
+
+/* If Wi-Fi sta connected */
+
+volatile bool g_sta_connected;
+
+/* Wi-Fi interface configuration */
+
+wifi_config_t g_sta_wifi_cfg;
+
+#endif /* ESPRESSIF_WLAN_HAS_STA */
+
+#ifdef ESPRESSIF_WLAN_HAS_SOFTAP
+
+/* If Wi-Fi SoftAP starts */
+
+volatile bool g_softap_started;
+
+/* Wi-Fi interface configuration */
+
+wifi_config_t g_softap_wifi_cfg;
+
+#endif /* ESPRESSIF_WLAN_HAS_SOFTAP */
+
+/****************************************************************************
  * Private Data
  ****************************************************************************/
 
@@ -876,7 +912,7 @@ static void wlan_rxpoll(void *arg)
         }
 
       /* We are finished with the RX buffer.  NOTE:  If the buffer is
-       * re-used for transmission, the dev->d_buf field will have been
+       * reused for transmission, the dev->d_buf field will have been
        * nullified.
        */
 
@@ -1609,7 +1645,7 @@ static int esp_net_initialize(int devno, uint8_t *mac_addr,
  *
  * Description:
  *   Wi-Fi station RX done callback function. If this is called, it means
- *   station receiveing packet.
+ *   station receiving packet.
  *
  * Input Parameters:
  *   buffer - Wi-Fi received packet buffer
@@ -1659,7 +1695,7 @@ static void wlan_sta_tx_done(uint8_t *data, uint16_t *len, bool status)
  *
  * Description:
  *   Wi-Fi softAP RX done callback function. If this is called, it means
- *   softAP receiveing packet.
+ *   softAP receiving packet.
  *
  * Input Parameters:
  *   buffer - Wi-Fi received packet buffer

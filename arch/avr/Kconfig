@@ -28,6 +28,7 @@ config ARCH_CHIP_AVRDX
 	select ARCH_FAMILY_AVR
 	select MM_SMALL
 	select ARCH_HAVE_TICKLESS
+	select AVR_HAVE_FLMAP
 	---help---
 		Atmel/Microchip AVR 32/64/128 DA/DB core family.
 
@@ -49,6 +50,7 @@ config ARCH_FAMILY_AVR
 	bool
 	default n
 	select ARCH_HAVE_STACKCHECK
+	select ARCH_LDST_16BIT_NOT_ATOMIC
 
 config ARCH_FAMILY_AVR32
 	bool

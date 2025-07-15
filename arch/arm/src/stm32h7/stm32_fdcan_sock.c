@@ -2611,15 +2611,16 @@ static void fdcan_error_work(void *arg)
   psr = getreg32(priv->base + STM32_FDCAN_PSR_OFFSET);
 
   pending = (ir);
+  ie |= FDCAN_ANYERR_INTS;
 
   /* Check for common errors */
 
   if ((pending & FDCAN_CMNERR_INTS) != 0)
     {
-      /* When a protocol error ocurrs, the problem is recorded in
+      /* When a protocol error occurs, the problem is recorded in
        * the LEC/DLEC fields of the PSR register. In lieu of
-       * seprate interrupt flags for each error, the hardware
-       * groups procotol errors under a single interrupt each for
+       * separate interrupt flags for each error, the hardware
+       * groups protocol errors under a single interrupt each for
        * arbitration and data phases.
        *
        * These errors have a tendency to flood the system with
@@ -2630,7 +2631,6 @@ static void fdcan_error_work(void *arg)
       if ((psr & FDCAN_PSR_LEC_MASK) != 0)
         {
           ie &= ~(FDCAN_IE_PEAE | FDCAN_IE_PEDE);
-          putreg32(ie, priv->base + STM32_FDCAN_IE_OFFSET);
         }
 
       /* Clear the error indications */
@@ -2672,7 +2672,6 @@ static void fdcan_error_work(void *arg)
        */
 
       ie &= ~(pending & FDCAN_RXERR_INTS);
-      putreg32(ie, priv->base + STM32_FDCAN_IE_OFFSET);
 
       /* Clear the error indications */
 
@@ -2687,7 +2686,7 @@ static void fdcan_error_work(void *arg)
 
   /* Re-enable ERROR interrupts */
 
-  fdcan_errint(priv, true);
+  putreg32(ie, priv->base + STM32_FDCAN_IE_OFFSET);
 }
 
 /****************************************************************************
