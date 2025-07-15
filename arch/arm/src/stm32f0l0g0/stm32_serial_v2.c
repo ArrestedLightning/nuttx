@@ -129,7 +129,6 @@ struct up_dev_s
 #endif
   uint32_t          baud;      /* Configured baud */
 #else
-  const uint8_t     rxftcfg;   /* Rx FIFO threshold level */
   const uint8_t     parity;    /* 0=none, 1=odd, 2=even */
   const uint8_t     bits;      /* Number of bits (7 or 8) */
   const bool        stopbits2; /* True: Configure with 2 stop bits instead of 1 */
@@ -142,6 +141,7 @@ struct up_dev_s
   const uint32_t    baud;      /* Configured baud */
 #endif
 
+  const uint8_t     rxftcfg;   /* Rx FIFO threshold level */
   const uint8_t     irq;       /* IRQ associated with this USART */
   const uint32_t    apbclock;  /* PCLK 1 or 2 frequency */
   const uint32_t    usartbase; /* Base address of USART registers */
