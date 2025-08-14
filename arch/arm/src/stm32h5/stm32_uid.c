@@ -55,12 +55,13 @@ void stm32_get_uniqueid(uint8_t uniqueid[12])
 {
   int i;
   uint32_t *uid = (uint32_t *) uniqueid;
-
+  stm32_disable_icache();
   for (i = 0; i < 3; i++)
     {
       *uid = *((uint32_t *)(STM32_SYSMEM_UID) + i);
       uid++;
     }
+  stm32_enable_icache();
 }
 
 #endif /* STM32_SYSMEM_UID */
