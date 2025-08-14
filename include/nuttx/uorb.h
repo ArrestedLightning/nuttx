@@ -304,7 +304,7 @@
  * Motion detection sensor is used to detect the motion status of the device.
  * motion detect event is produced if the device has been in motion
  * for at least 5 seconds with a maximal latency of 5 additional seconds.
- * ie: it may take up anywhere from 5 to 10 seconds afte the device has been
+ * ie: it may take up anywhere from 5 to 10 seconds after the device has been
  * at rest to trigger this event. The only allowed value is 1.0.
  */
 
@@ -402,7 +402,7 @@
  * measurements come from photodiodes and following current amplifiers and
  * ADCs, where a photodiode switches reflected light intensity to current.
  * The LED current decides the lightness of LED, which is the input of PPG
- * measurements. The ADC gains are multipled on the output and affect SNR.
+ * measurements. The ADC gains are multiplied on the output and affect SNR.
  */
 
 #define SENSOR_TYPE_PPGD                            42
@@ -413,7 +413,7 @@
  * measurements come from photodiodes and following current amplifiers and
  * ADCs, where a photodiode switches reflected light intensity to current.
  * The LED current decides the lightness of LED, which is the input of PPG
- * measurements. The ADC gains are multipled on the output and affect SNR.
+ * measurements. The ADC gains are multiplied on the output and affect SNR.
  */
 
 #define SENSOR_TYPE_PPGQ                            43
@@ -429,7 +429,7 @@
 /* OTS (Optical tracking sensor)
  * A sensor of this type returns the OTS measurements in counts. It
  * integrates an optical chip and a LASER light source in a single miniature
- * package. It provies wide depth of field range on glossy surface, and
+ * package. It provides wide depth of field range on glossy surface, and
  * design flexibility into a compact device.
  */
 
@@ -525,6 +525,17 @@
 /* GNSS satellite info slots */
 
 #define SENSOR_GNSS_SAT_INFO_MAX                    4
+
+/* GNSS satellite status flags, see `flags` of `struct sensor_gnss_satellite`
+ * Refs: https://android.googlesource.com/platform/hardware/libhardware/+/
+ *       refs/heads/android14-release/include/hardware/gnss-base.h#134
+ */
+
+#define SENSOR_GNSS_SV_FLAGS_NONE                   (0)
+#define SENSOR_GNSS_SV_FLAGS_HAS_EPHEMERIS_DATA     (1 << 0)
+#define SENSOR_GNSS_SV_FLAGS_HAS_ALMANAC_DATA       (1 << 1)
+#define SENSOR_GNSS_SV_FLAGS_USED_IN_FIX            (1 << 2)
+#define SENSOR_GNSS_SV_FLAGS_HAS_CARRIER_FREQUENCY  (1 << 3)
 
 /* Maximum length of sensor device information name and path name. */
 
@@ -951,7 +962,11 @@ struct sensor_gnss_satellite
 
   uint32_t constellation;
 
-  float cf;                 /* Carrier Frequency(Hz), GSV.signal_id */
+  /* Carrier Frequency(Hz), GSV.signal_id.
+   * Flag: SENSOR_GNSS_SV_FLAGS_HAS_CARRIER_FREQUENCY
+   */
+
+  float cf;
 
   struct satellite
   {
@@ -972,12 +987,18 @@ struct sensor_gnss_satellite
    */
 
     uint32_t snr;
+
+  /* Indicating what fields are valid. */
+
+    uint32_t flags;
   }
   info[SENSOR_GNSS_SAT_INFO_MAX];
 };
 
 struct sensor_gnss_measurement
 {
+  uint64_t timestamp;       /* Time since system start, Units is microseconds */
+
   /* Indicating what fields are valid.
    * See SENSOR_GNSS_MEASUREMENT_HAS_*.
    */
@@ -1048,6 +1069,8 @@ struct sensor_gnss_measurement
 
 struct sensor_gnss_clock
 {
+  uint64_t timestamp;       /* Time since system start, Units is microseconds */
+
   /* Indicating what fields are valid.
    * See SENSOR_GNSS_CLOCK_HAS_*.
    */
@@ -1166,7 +1189,7 @@ struct sensor_state_s
   uint32_t nbuffer;            /* The number of events that the circular buffer can hold */
   uint32_t min_latency;        /* The minimum batch latency for sensor, in us */
   uint32_t min_interval;       /* The minimum subscription interval for sensor, in us */
-  uint32_t nsubscribers;       /* The number of subcribers */
+  uint32_t nsubscribers;       /* The number of subscribers */
   uint32_t nadvertisers;       /* The number of advertisers */
   uint32_t generation;         /* The recent generation of circular buffer */
   uint64_t priv;               /* The pointer to private data of userspace user */

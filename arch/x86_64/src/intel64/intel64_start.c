@@ -37,8 +37,8 @@
 
 #include "x86_64_internal.h"
 
-#include "intel64_cpu.h"
 #include "intel64_lowsetup.h"
+#include "intel64_cpu.h"
 
 /****************************************************************************
  * Public Data
@@ -111,7 +111,7 @@ static void x86_64_mb2_config(void)
             {
               /* We have to postpone frame buffer initialization because
                * at this boot stage we can't map >4GB memory yet and it's
-               * possible that frame bufer address is above 4GB.
+               * possible that frame buffer address is above 4GB.
                */
 
               g_mb_fb_tag = (struct multiboot_tag_framebuffer *)tag;
@@ -159,6 +159,15 @@ void __nxstart(void)
     {
       *dest++ = 0;
     }
+
+#ifdef CONFIG_SCHED_THREAD_LOCAL
+  /* Make sure that FS_BASE is not null */
+
+  write_fsbase((uintptr_t)(g_idle_topstack[0] -
+                           CONFIG_IDLETHREAD_STACKSIZE +
+                           sizeof(struct tls_info_s) +
+                           (_END_TBSS - _START_TDATA)));
+#endif
 
   /* Low-level, pre-OS initialization */
 

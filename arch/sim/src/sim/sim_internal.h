@@ -107,6 +107,12 @@
 #define sim_savestate(regs) sim_copyfullstate(regs, up_current_regs())
 #define sim_restorestate(regs) up_set_current_regs(regs)
 
+/* Provide a common interface, which should have different conversions
+ * on different platforms.
+ */
+
+#define host_errno_convert(errcode) (errcode)
+
 #define sim_saveusercontext(saveregs, ret)                      \
     do                                                          \
       {                                                         \
@@ -134,8 +140,6 @@
 
 #define host_uninterruptible(func, ...)                         \
     ({                                                          \
-        extern uint64_t up_irq_save(void);                      \
-        extern void up_irq_restore(uint64_t flags);             \
         uint64_t flags_ = up_irq_save();                        \
         typeof(func(__VA_ARGS__)) ret_ = func(__VA_ARGS__);     \
         up_irq_restore(flags_);                                 \
@@ -145,13 +149,23 @@
 #define host_uninterruptible_no_return(func, ...)               \
     do                                                          \
       {                                                         \
-        extern uint64_t up_irq_save(void);                      \
-        extern void up_irq_restore(uint64_t flags);             \
         uint64_t flags_ = up_irq_save();                        \
         func(__VA_ARGS__);                                      \
         up_irq_restore(flags_);                                 \
       }                                                         \
     while (0)
+
+#define host_uninterruptible_errno(func, ...)                   \
+    ({                                                          \
+        uint64_t flags_ = up_irq_save();                        \
+        typeof(func(__VA_ARGS__)) ret_ = func(__VA_ARGS__);     \
+        if (ret_ < 0)                                           \
+          {                                                     \
+            ret_ = host_errno_convert(-errno);                  \
+          }                                                     \
+        up_irq_restore(flags_);                                 \
+        ret_;                                                   \
+    })
 
 /* File System Definitions **************************************************/
 
@@ -203,6 +217,9 @@ extern char **g_argv;
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
+
+uint64_t up_irq_save(void);
+void up_irq_restore(uint64_t flags);
 
 /* Context switching */
 
@@ -482,6 +499,18 @@ int sim_usbdev_loop(void);
 #ifdef CONFIG_SIM_USB_HOST
 int sim_usbhost_initialize(void);
 int sim_usbhost_loop(void);
+#endif
+
+/* sim_canchar.c ************************************************************/
+
+#ifdef CONFIG_SIM_CANDEV_CHAR
+int sim_canchar_initialize(int devidx, int devno);
+#endif
+
+/* sim_cansock.c ************************************************************/
+
+#ifdef CONFIG_SIM_CANDEV_SOCK
+int sim_cansock_initialize(int devidx);
 #endif
 
 /* Debug ********************************************************************/

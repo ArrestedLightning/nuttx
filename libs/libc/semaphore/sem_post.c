@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <assert.h>
 
+#include <nuttx/sched.h>
 #include <nuttx/semaphore.h>
 #include <nuttx/atomic.h>
 
@@ -118,29 +119,61 @@ int sem_post(FAR sem_t *sem)
 
 int nxsem_post(FAR sem_t *sem)
 {
+  bool fastpath = true;
+  bool mutex;
+
   DEBUGASSERT(sem != NULL);
 
-  /* We don't do atomic fast path in case of LIBC_ARCH_ATOMIC because that
-   * uses spinlocks, which can't be called from userspace. Also in the kernel
-   * taking the slow path directly is faster than locking first in here
-   */
+  mutex = NXSEM_IS_MUTEX(sem);
 
-#ifndef CONFIG_LIBC_ARCH_ATOMIC
+  /* Disable fast path if priority protection is enabled on the semaphore */
 
-  if ((sem->flags & SEM_TYPE_MUTEX)
-#  if defined(CONFIG_PRIORITY_PROTECT) || defined(CONFIG_PRIORITY_INHERITANCE)
-      && (sem->flags & SEM_PRIO_MASK) == SEM_PRIO_NONE
-#  endif
-      )
+#ifdef CONFIG_PRIORITY_PROTECT
+  if ((sem->flags & SEM_PRIO_MASK) == SEM_PRIO_PROTECT)
     {
-      int32_t old = 0;
-      if (atomic_try_cmpxchg_release(NXSEM_COUNT(sem), &old, 1))
+      fastpath = false;
+    }
+#endif
+
+  /* Disable fast path on a counting semaphore with priority inheritance */
+
+#ifdef CONFIG_PRIORITY_INHERITANCE
+  if (!mutex && (sem->flags & SEM_PRIO_MASK) != SEM_PRIO_NONE)
+    {
+      fastpath = false;
+    }
+#endif
+
+  while (fastpath)
+    {
+      FAR atomic_t *val = mutex ? NXSEM_MHOLDER(sem) : NXSEM_COUNT(sem);
+      int32_t old = atomic_read(val);
+      int32_t new;
+
+      if (mutex)
+        {
+          if (NXSEM_MBLOCKING(old))
+            {
+              break;
+            }
+
+          new = NXSEM_NO_MHOLDER;
+        }
+      else
+        {
+          if (old < 0)
+            {
+              break;
+            }
+
+          new = old + 1;
+        }
+
+      if (atomic_try_cmpxchg_release(val, &old, new))
         {
           return OK;
         }
     }
-
-#endif
 
   return nxsem_post_slow(sem);
 }

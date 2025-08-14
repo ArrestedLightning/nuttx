@@ -27,8 +27,9 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
 #include "hardware/imx9_ele.h"
+#include <sys/types.h>
+#include <stdint.h>
 
 /****************************************************************************
  * Public Function Prototypes
@@ -126,7 +127,7 @@ int imx9_ele_get_key(uint8_t *key, size_t key_size,
  *   buffer_size   -  Event buffer size
  *
  * Returned Value:
- *  Zero (OK) is returned if no envents success. A negated errno value
+ *  Zero (OK) is returned if no events success. A negated errno value
  *  is returned on failure. Positive value is number of events read.
  *
  ****************************************************************************/
@@ -143,7 +144,7 @@ int imx9_ele_get_events(uint32_t *buffer, size_t buffer_size);
  *   OEM close state. This operation is irreversible.
  *
  * Returned Value:
- *  Zero (OK) is returned if no envents success. A negated errno value
+ *  Zero (OK) is returned if no events success. A negated errno value
  *  is returned on failure.
  *
  ****************************************************************************/
@@ -163,4 +164,107 @@ int imx9_ele_close_device(void);
 
 uint32_t imx9_ele_get_lifecycle(void);
 
+/****************************************************************************
+ * Name: imx9_ele_auth_oem_ctnr
+ *
+ * Description:
+ *   Authenticate container header.
+ *
+ * Input Parameters:
+ *   ctnr_addr - Address of the container header.
+ *
+ * Output Parameters:
+ *   response - ELE response, can be used for debugging.
+ *
+ * Returned Value:
+ *   Zero (OK) is returned for success. A negated errno value is returned on
+ *   failure.
+ *
+ ****************************************************************************/
+
+int imx9_ele_auth_oem_ctnr(unsigned long ctnr_addr, uint32_t *response);
+
+/****************************************************************************
+ * Name: imx9_ele_release_container
+ *
+ * Description:
+ *   Release the container from the ELE, used after imx9_ele_auth_oem_ctnr().
+ *
+ * Output Parameters:
+ *   response - ELE response, can be used for debugging.
+ *
+ * Returned Value:
+ *   Zero (OK) is returned for success. A negated errno value is returned on
+ *   failure.
+ *
+ ****************************************************************************/
+
+int imx9_ele_release_container(uint32_t *response);
+
+/****************************************************************************
+ * Name: imx9_ele_verify_image
+ *
+ * Description:
+ *   Verify the specified image, for the current container.
+ *
+ * Input Parameters:
+ *   img_id - The id of the image in the context of the current container.
+ *
+ * Output Parameters:
+ *   response - ELE response, can be used for debugging.
+ *
+ * Returned Value:
+ *   Zero (OK) is returned for success. A negated errno value is returned on
+ *   failure.
+ *
+ ****************************************************************************/
+
+int imx9_ele_verify_image(uint32_t img_id, uint32_t *response);
+
+/****************************************************************************
+ * Name: imx9_ele_start_rng
+ *
+ * Description:
+ *   Sends command to initialize the ELE RNG context.
+ *
+ * Returned Value:
+ *   Zero (OK) is returned for success. A negated errno value is returned on
+ *   failure.
+ *
+ ****************************************************************************/
+
+int imx9_ele_start_rng(void);
+
+/****************************************************************************
+ * Name: imx9_ele_get_trng_state
+ *
+ * Description:
+ *   Query the state of the True Random Number Generator.
+ *
+ * Returned Value:
+ *   Zero is returned if the Random Number Generator (RNG) is ready for use.
+ *   A negated errno value (-EBUSY) or another is returned on failure.
+ *
+ ****************************************************************************/
+
+int imx9_ele_get_trng_state(void);
+
+/****************************************************************************
+ * Name: imx9_ele_get_random
+ *
+ * Description:
+ *   Request from the ELE the generation of a random number of specified
+ *   length.
+ *
+ * Input Parameters:
+ *   paddr  -  32bit physical address to store the random number.
+ *   len    -  Length in bytes of the random number.
+ *
+ * Returned Value:
+ *   Zero is returned if ELE successfully generated the random number.
+ *   A negated errno value (-EBUSY) or another is returned on failure.
+ *
+ ****************************************************************************/
+
+int imx9_ele_get_random(uint32_t paddr, size_t len);
 #endif /* __ARCH_ARM64_SRC_IMX9_IMX9_ELE_H */

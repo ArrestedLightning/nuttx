@@ -82,7 +82,8 @@
 
 /* System Bus Interfaces */
 
-#if defined(CONFIG_ARCH_CHIP_SAMV71) || defined(CONFIG_ARCH_CHIP_SAME70)
+#if defined(CONFIG_ARCH_CHIP_SAMV71) || defined(CONFIG_ARCH_CHIP_SAME70) || \
+    defined(CONFIG_ARCH_CHIP_PIC32CZCA70)
 #  define HSMCI_SYSBUS_IF  DMACH_FLAG_PERIPHAHB_AHB_IF1
 #  define MEMORY_SYSBUS_IF DMACH_FLAG_MEMAHB_AHB_IF0
 #else
@@ -678,7 +679,7 @@ static int sam_carddetect_handler(int irq, void *context,
  *
  * Returned Value:
  *   true:  This is the first register access of this type.
- *   flase: This is the same as the preceding register access.
+ *   false: This is the same as the preceding register access.
  *
  ****************************************************************************/
 

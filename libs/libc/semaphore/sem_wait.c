@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <sched.h>
 
+#include <nuttx/sched.h>
 #include <nuttx/init.h>
 #include <nuttx/cancelpt.h>
 #include <nuttx/semaphore.h>
@@ -134,35 +135,68 @@ errout_with_cancelpt:
 
 int nxsem_wait(FAR sem_t *sem)
 {
+  bool fastpath = true;
+  bool mutex;
+
+  DEBUGASSERT(sem != NULL);
+
   /* This API should not be called from the idleloop or interrupt */
 
 #if defined(CONFIG_BUILD_FLAT) || defined(__KERNEL__)
-  DEBUGASSERT(sem != NULL);
-  DEBUGASSERT(!up_interrupt_context());
-  DEBUGASSERT(!OSINIT_IDLELOOP() || !sched_idletask());
+  DEBUGASSERT(!OSINIT_IDLELOOP() || !sched_idletask() ||
+              up_interrupt_context());
 #endif
 
-  /* We don't do atomic fast path in case of LIBC_ARCH_ATOMIC because that
-   * uses spinlocks, which can't be called from userspace. Also in the kernel
-   * taking the slow path directly is faster than locking first in here
-   */
+  mutex = NXSEM_IS_MUTEX(sem);
 
-#ifndef CONFIG_LIBC_ARCH_ATOMIC
+  /* Disable fast path if priority protection is enabled on the semaphore */
 
-  if ((sem->flags & SEM_TYPE_MUTEX)
-#  if defined(CONFIG_PRIORITY_PROTECT) || defined(CONFIG_PRIORITY_INHERITANCE)
-      && (sem->flags & SEM_PRIO_MASK) == SEM_PRIO_NONE
-#  endif
-      )
+#ifdef CONFIG_PRIORITY_PROTECT
+  if ((sem->flags & SEM_PRIO_MASK) == SEM_PRIO_PROTECT)
     {
-      int32_t old = 1;
-      if (atomic_try_cmpxchg_acquire(NXSEM_COUNT(sem), &old, 0))
+      fastpath = false;
+    }
+#endif
+
+  /* Disable fast path on a counting semaphore with priority inheritance */
+
+#ifdef CONFIG_PRIORITY_INHERITANCE
+  if (!mutex && (sem->flags & SEM_PRIO_MASK) != SEM_PRIO_NONE)
+    {
+      fastpath = false;
+    }
+#endif
+
+  while (fastpath)
+    {
+      FAR atomic_t *val = mutex ? NXSEM_MHOLDER(sem) : NXSEM_COUNT(sem);
+      int32_t old = atomic_read(val);
+      int32_t new;
+
+      if (mutex)
+        {
+          if (old != NXSEM_NO_MHOLDER)
+            {
+              break;
+            }
+
+          new = _SCHED_GETTID();
+        }
+      else
+        {
+          if (old < 1)
+            {
+              break;
+            }
+
+          new = old - 1;
+        }
+
+      if (atomic_try_cmpxchg_acquire(val, &old, new))
         {
           return OK;
         }
     }
-
-#endif
 
   return nxsem_wait_slow(sem);
 }

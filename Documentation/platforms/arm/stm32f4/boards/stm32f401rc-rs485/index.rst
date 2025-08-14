@@ -2,6 +2,8 @@
 stm32f401rc-rs485
 =================
 
+.. tags:: chip:stm32, chip:stm32f4, chip:stm32f401
+
 This page discusses issues unique to NuttX configurations for the
 NuttX STM32F4-RS485 development board.
 
@@ -231,7 +233,7 @@ usbnsh
 Configures the NuttShell (nsh) located at apps/examples/nsh. This
 configuration enables a serial console over USB.
 
-After flasing and reboot your board you should see in your dmesg logs::
+After flashing and reboot your board you should see in your dmesg logs::
 
        [ 2638.948089] usb 1-1.4: new full-speed USB device number 16 using xhci_hcd
        [ 2639.054432] usb 1-1.4: New USB device found, idVendor=0525, idProduct=a4a7, bcdDevice= 1.01
@@ -262,7 +264,7 @@ modbus_slave
 
 Configures the NuttShell (nsh) and enables modbus in slave mode. This
 configuration enables a serial console on USART6. The RS-485 is connected
-to USART2. Follow below precedure to use modbus test aplication, you will
+to USART2. Follow below procedure to use modbus test application, you will
 need a USB to RS-485 converter to connect the board to a PC via RS-485.
 
 NuttShell configuration:
@@ -283,7 +285,7 @@ Run modbus application at NSH::
 
 PC Configuration:
 
-Download and install mbpoll aplication::
+Download and install mbpoll application::
 
        sudo apt install mbpoll
 
@@ -340,12 +342,12 @@ modbus_master
 
 Configures the NuttShell (nsh) and enables modbus in master mode. This
 configuration enables a serial console on USART6. The RS-485 is connected
-to USART2. Follow below precedure to use modbusmaster test aplication, you will
+to USART2. Follow below procedure to use modbusmaster test application, you will
 need a USB to RS-485 converter to connect the board to a PC via RS-485.
 
 PC Configuration:
 
-Download and install diagslave aplication from https://www.modbusdriver.com/diagslave.html.
+Download and install diagslave application from https://www.modbusdriver.com/diagslave.html.
 
 Check which TTY USB port is being used by you USB to RS-485 converter::
 
@@ -427,7 +429,7 @@ NSH commands::
        Usage: adc [OPTIONS]
 
        Arguments are "sticky".  For example, once the ADC device is
-       specified, that device will be re-used until it is changed.
+       specified, that device will be reused until it is changed.
 
        "sticky" OPTIONS include:
          [-p devpath] selects the ADC device.  Default: /dev/adc0 Current: /dev/adc0
@@ -454,7 +456,7 @@ NSH commands::
        Usage: pwm [OPTIONS]
 
        Arguments are "sticky".  For example, once the PWM frequency is
-       specified, that frequency will be re-used until it is changed.
+       specified, that frequency will be reused until it is changed.
 
        "sticky" OPTIONS include:
          [-p devpath] selects the PWM device.  Default: /dev/pwm0 Current: NONE
@@ -612,7 +614,7 @@ NSH commands::
 
 Get the ip address assigned to eth0 and convert to hexadecimal, for example 192.168.1.2
 becomes 0xC0A80102, than configure CONFIG_NETINIT_IPADDR and CONFIG_EXAMPLES_TELNETD_IPADDR,
-also configure the router address, in this example it woukd be 0xC0A80101. After theses changes
+also configure the router address, in this example it would be 0xC0A80101. After these changes
 rebuild and load the new firmware on your board::
 
        nsh> mount -t procfs /proc
@@ -659,7 +661,7 @@ DIN     PA7
 Clk     PA5
 ======= ====
 
-As this LED matrix can be combined either horizontally or vetically,
+As this LED matrix can be combined either horizontally or vertically,
 you can configure this using menuconfig::
 
        Number of 8x8 LEDs matrices in the horizontal (width)
@@ -848,9 +850,6 @@ features such as scheduling and multi-sensor handling.
 - ``value1`` corresponds to pressure in hPa (hectopascals).
 - ``value2`` corresponds to temperature in tenths of degrees Celsius (e.g., 224.00 = 22.4°C).
 
-Hardware Connections
---------------------
-
 Connect the BMP180 sensor to the STM32 board using the I2C interface.
 
 +--------+------+
@@ -860,3 +859,251 @@ Connect the BMP180 sensor to the STM32 board using the I2C interface.
 +--------+------+
 | SCL    | PB8  |
 +--------+------+
+
+ST7735
+======
+
+This example shows how to bring up and use a ST7735-based TFT LCD display in NuttX.
+
+How to add support for the ST7735 display to a new board in NuttX:
+
+1. **LCD Initialization:**
+   Implement LCD initialization/uninitialization in `stm32_lcd_st7735.c`
+   to handle the display. You can copy this from another board that
+   supports ST7735.
+
+2. **Update CMakeLists.txt and Make.defs:**
+   Add `stm32_lcd_st7735.c` if `CONFIG_LCD_ST7735` is enabled.
+
+3. **SPI Initialization:**
+   Ensure SPI is configured in `stm32_spi.c` for the ST7735.
+
+4. **Board Setup:**
+   Configure GPIO pins for RESET, DC, and CS.
+
+You can wire the display to your board this way:
+
++------------+---------+
+| LCD        | PIN     |
++============+=========+
+| CS         | PB7     |
++------------+---------+
+| DC         | PB8     |
++------------+---------+
+| RESET      | PB6     |
++------------+---------+
+| SDA (MOSI) | PA7     |
++------------+---------+
+| SCK (SCLK) | PA5     |
++------------+---------+
+
+.. note::
+
+   The ST7735 uses the SPI interface.
+   ``SDA`` corresponds to SPI ``MOSI`` (Master Out Slave In),
+   and ``SCK`` corresponds to SPI ``SCLK`` (Serial Clock).
+
+Enable the following options using ``make menuconfig``:
+--------------------------------------------------------
+
+::
+
+    CONFIG_DRIVERS_VIDEO=y
+    CONFIG_EXAMPLES_FB=y
+    CONFIG_LCD=y
+    CONFIG_LCD_FRAMEBUFFER=y
+    CONFIG_LCD_ST7735=y
+    CONFIG_SPI_CMDDATA=y
+    CONFIG_STM32_SPI1=y
+    CONFIG_VIDEO_FB=y
+
+NSH usage
+---------
+
+::
+
+    NuttShell (NSH) NuttX-12.9.0
+    nsh> fb
+    VideoInfo:
+          fmt: 11
+         xres: 160
+         yres: 128
+      nplanes: 1
+    PlaneInfo (plane 0):
+        fbmem: 0x20003598
+        fblen: 40960
+       stride: 320
+      display: 0
+          bpp: 16
+    Mapped FB: 0x20003598
+     0: (  0,  0) (160,128)
+     1: ( 14, 11) (132,106)
+     2: ( 28, 22) (104, 84)
+     3: ( 42, 33) ( 76, 62)
+     4: ( 56, 44) ( 48, 40)
+     5: ( 70, 55) ( 20, 18)
+    Test finished
+
+HX711
+-----
+
+HX711 is a precision 24-bit analog-to-digital converter (ADC)
+designed for weigh scales and industrial control applications.
+It interfaces load cells via a simple two-wire serial interface
+(clock and data) and provides high-resolution digital weight
+measurements.
+
+**Enable the following options using ``make menuconfig``:**
+
+::
+
+    CONFIG_ADC=y
+    CONFIG_ANALOG=y
+    CONFIG_ADC_HX711=y
+    CONFIG_EXAMPLES_HX711=y
+
+**Wiring:**
+
+Connect the HX711 to the STM32F4 board using the following pins:
+
++--------+------+
+| HX711  | PIN  |
++========+======+
+| SCK    | PB1  |
++--------+------+
+| DT     | PB2  |
++--------+------+
+
+**NSH usage:**
+
+::
+
+    NuttShell (NSH) NuttX-12.10.0-RC0
+    nsh> hx711 -D
+    Current settings for: /dev/hx711_0
+    average.............: 1
+    channel.............: a
+    gain................: 128
+    value per unit......: 0
+    nsh> hx711 -v 813 -t 10
+    Taring with *float*g precision
+    nsh> hx711 -r 10
+    11
+    9
+    9
+    10
+    11
+    11
+    11
+    12
+    11
+    10
+
+For more details, refer to the official `HX711 NuttX documentation <https://nuttx.apache.org/docs/latest/components/drivers/character/analog/adc/hx711/index.html>`_.
+
+MAX31855
+--------
+
+MAX31855 is a thermocouple-to-digital converter supporting Type-K
+thermocouples. It provides 14-bit temperature resolution with cold-junction
+compensation and fault detection, interfacing via SPI.
+
+**Enable the following options using ``make menuconfig``:**
+
+::
+
+    CONFIG_STM32_SPI1=y
+    CONFIG_SENSORS=y
+    CONFIG_SENSORS_MAX31855=y
+    CONFIG_EXAMPLES_MAX31855=y
+
+**Wiring:**
+
+Connect the MAX31855 to the STM32F4 board using the following pins:
+
++-------------+------+
+| MAX31855    | PIN  |
++=============+======+
+| SCK         | PA5  |
++-------------+------+
+| CS          | PC4  |
++-------------+------+
+| SO (MISO)   | PA6  |
++-------------+------+
+
+**NSH usage:**
+
+::
+
+    NuttShell (NSH) NuttX-12.10.0
+    nsh> ls /dev/temp0
+     /dev/temp0
+    nsh> max31855
+    Unable to open file /dev/temp1
+    Unable to open file /dev/temp2
+    Unable to open file /dev/temp3
+    Starting...
+    Channel SSP0/SPI1 Device 0: Temperature = 24!
+    Channel SSP0/SPI1 Device 1: Not enabled!
+    Channel SSP1/SPI2 Device 0: Not enabled!
+    Channel SSP1/SPI2 Device 1: Not enabled!
+
+    Channel SSP0/SPI1 Device 0: Temperature = 25!
+    Channel SSP0/SPI1 Device 1: Not enabled!
+    Channel SSP1/SPI2 Device 0: Not enabled!
+    Channel SSP1/SPI2 Device 1: Not enabled!
+
+
+
+MAX6675
+-------
+
+MAX6675 is a cold-junction-compensated K-type thermocouple-to-digital
+converter with a 12-bit resolution. It communicates via SPI and is
+suited for measuring high temperatures in embedded systems.
+
+**Enable the following options using ``make menuconfig``:**
+
+::
+
+    CONFIG_STM32_SPI1=y
+    CONFIG_SENSORS=y
+    CONFIG_SENSORS_MAX6675=y
+    CONFIG_EXAMPLES_MAX31855=y (same example works for both)
+
+**Wiring:**
+
+Connect the MAX6675 to the STM32F4 board using the following pins:
+
++-------------+------+
+| MAX6675     | PIN  |
++=============+======+
+| SCK         | PA5  |
++-------------+------+
+| CS          | PC5  |
++-------------+------+
+| SO (MISO)   | PA6  |
++-------------+------+
+
+**NSH usage:**
+
+::
+
+        NuttShell (NSH) NuttX-12.10.0
+    nsh> ls /dev/temp0
+     /dev/temp0
+    nsh> max31855
+    Unable to open file /dev/temp1
+    Unable to open file /dev/temp2
+    Unable to open file /dev/temp3
+    Starting...
+    Channel SSP0/SPI1 Device 0: Temperature = 24!
+    Channel SSP0/SPI1 Device 1: Not enabled!
+    Channel SSP1/SPI2 Device 0: Not enabled!
+    Channel SSP1/SPI2 Device 1: Not enabled!
+
+    Channel SSP0/SPI1 Device 0: Temperature = 24!
+    Channel SSP0/SPI1 Device 1: Not enabled!
+    Channel SSP1/SPI2 Device 0: Not enabled!
+    Channel SSP1/SPI2 Device 1: Not enabled!
+

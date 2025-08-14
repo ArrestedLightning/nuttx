@@ -537,8 +537,14 @@ static void gnss_parse_nmea(FAR struct gnss_upperhalf_s *upper,
               satellite.timestamp = sensor_get_timestamp();
               satellite.count = frame.total_msgs;
               satellite.satellites = frame.total_sats;
-              memcpy(satellite.info, frame.sats,
-                     sizeof(satellite.info[0]) * 4);
+              for (i = 0; i < SENSOR_GNSS_SAT_INFO_MAX; i++)
+                {
+                  satellite.info[i].svid      = frame.sats[i].nr;
+                  satellite.info[i].elevation = frame.sats[i].elevation;
+                  satellite.info[i].azimuth   = frame.sats[i].azimuth;
+                  satellite.info[i].snr       = frame.sats[i].snr;
+                }
+
               lower = &upper->dev[SENSOR_GNSS_IDX_GNSS_SATELLITE].lower;
 
               for (i = 0; i < nitems(g_gnss_constellation); i++)
@@ -704,7 +710,7 @@ static void gnss_push_event(FAR void *priv, FAR const void *data,
  *             instance is bound to the GNSS driver and must persist as long
  *             as the driver persists.
  *   devno   - The user specifies which device of this type, from 0. If the
- *             devno alerady exists, -EEXIST will be returned.
+ *             devno already exists, -EEXIST will be returned.
  *   nbuffer - The number of events that the circular buffer can hold.
  *   count   - The array size of nbuffer.
  *

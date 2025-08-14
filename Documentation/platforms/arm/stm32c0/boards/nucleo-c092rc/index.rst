@@ -2,6 +2,8 @@
 ST Nucleo C092RC
 ================
 
+.. tags:: chip:stm32, chip:stm32c0, chip:stm32c092
+
 The Nucleo C092RC is a member of the Nucleo-64 board family.
 
 CANFD not supported yet.
@@ -42,3 +44,15 @@ Enabled features:
 - ADC with DMA enabled using A0 and A1 pins
 
 - button with software debouncing enabled (no RC filter on the board)
+
+can
+---
+
+Configuration with FDCAN enabled as character driver and
+``examples/can`` included as builtin application.
+
+cansock
+-------
+
+Configuration with FDCAN enabled as SocketCAN interface with ``candump``
+and ``cansend`` utils included as builtin applications.

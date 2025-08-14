@@ -413,8 +413,8 @@ static int dns_send_query(int sd, FAR const char *name,
   /* Convert hostname into suitable query format.
    *
    * There is space for CONFIG_NETDB_DNSCLIENT_NAMESIZE
-   * plus one pre-pended name length and NUL-terminator
-   * (other pre-pended name lengths replace dots).
+   * plus one prepended name length and NUL-terminator
+   * (other prepended name lengths replace dots).
    */
 
   src   = name - 1;
@@ -441,7 +441,7 @@ static int dns_send_query(int sd, FAR const char *name,
           len++;
         }
 
-      /* Pre-pend the name length */
+      /* Prepend the name length */
 
       *nptr = n;
       *qptr = n;
@@ -854,12 +854,15 @@ static int dns_query_callback(FAR void *arg, FAR struct sockaddr *addr,
   bool stream = false;
 
   /* Loop while receive timeout errors occur and there are remaining
-   * retries.
+   * retries. Use progressive timeout strategy.
    */
 
   for (retries = 0; retries < CONFIG_NETDB_DNSCLIENT_RETRIES; retries++)
     {
       bool should_try_stream;
+
+      ninfo("INFO: DNS query retry %d/%d\n",
+            retries + 1, CONFIG_NETDB_DNSCLIENT_RETRIES);
 
 try_stream:
 #ifdef CONFIG_NET_IPv6
@@ -867,7 +870,7 @@ try_stream:
         {
           /* Send the IPv6 query */
 
-          sd = dns_bind(addr->sa_family, stream);
+          sd = dns_bind(addr->sa_family, stream, retries);
           if (sd < 0)
             {
               query->result = sd;
@@ -902,6 +905,7 @@ try_stream:
                 {
                   if (!stream && should_try_stream)
                     {
+                      close(sd);  /* Close current socket before trying stream mode */
                       stream = true;
                       goto try_stream; /* Don't consume retry count */
                     }
@@ -921,7 +925,7 @@ try_stream:
         {
           /* Send the IPv4 query */
 
-          sd = dns_bind(addr->sa_family, stream);
+          sd = dns_bind(addr->sa_family, stream, retries);
           if (sd < 0)
             {
               query->result = sd;
@@ -961,6 +965,7 @@ try_stream:
                 {
                   if (!stream && should_try_stream)
                     {
+                      close(sd);  /* Close current socket before trying stream mode */
                       stream = true;
                       goto try_stream; /* Don't consume retry count */
                     }

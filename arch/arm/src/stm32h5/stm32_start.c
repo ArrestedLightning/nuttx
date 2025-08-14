@@ -206,7 +206,6 @@ void __start(void)
   stm32_gpioinit();
   showprogress('A');
 
-
 #ifdef CONFIG_ARMV8M_STACKCHECK
   arm_stack_check_init();
 #endif
@@ -239,7 +238,7 @@ void __start(void)
 
   nx_start();
 
-  /* Shoulnd't get here */
+  /* Shouldn't get here */
 
   for (; ; );
 }

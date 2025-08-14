@@ -171,12 +171,16 @@ if(CONFIG_LCD_ST7789)
   list(APPEND SRCS stm32_st7789.c)
 endif()
 
+if(CONFIG_ADC_HX711)
+  list(APPEND SRCS stm32_hx711.c)
+endif()
+
 target_sources(board PRIVATE ${SRCS})
 
 # TODO: make this the default and then allow boards to redefine
 set_property(GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/ld.script")
 
-# TODO:move this to apropriate arch/toolchain level
+# TODO:move this to appropriate arch/toolchain level
 set_property(
   GLOBAL APPEND
   PROPERTY COMPILE_OPTIONS $<$<CONFIG:Release>:-fno-strict-aliasing

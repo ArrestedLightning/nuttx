@@ -51,6 +51,7 @@
 
 #include "spi_flash_defs.h"
 #include "hal/cache_hal.h"
+#include "hal/cache_ll.h"
 #include "soc/extmem_reg.h"
 #include "soc/spi_mem_reg.h"
 #include "rom/opi_flash.h"
@@ -475,7 +476,7 @@ static void esp32s3_spi_trans(uint32_t command,
   uint32_t user1_reg = getreg32(SPI_MEM_USER1_REG(SPI_PORT));
   uint32_t user_reg = getreg32(SPI_MEM_USER_REG(SPI_PORT));
 
-  /* Initiliaze SPI user register */
+  /* Initialize SPI user register */
 
   user_reg &= ~(SPI_MEM_USR_DUMMY_M | SPI_MEM_USR_MOSI_M |
                 SPI_MEM_USR_MISO_M | SPI_MEM_USR_ADDR_M);
@@ -629,7 +630,7 @@ static void esp32s3_spi_trans(uint32_t command,
       cmd_reg |= SPI_MEM_FLASH_PE_M;
     }
 
-  /* Start transmision */
+  /* Start transmission */
 
   cmd_reg |= SPI_MEM_USR_M;
   putreg32(cmd_reg, SPI_MEM_CMD_REG(SPI_PORT));
@@ -887,7 +888,7 @@ static inline void IRAM_ATTR spiflash_os_yield(void)
 
 static void spi_flash_disable_cache(void)
 {
-  cache_hal_suspend(CACHE_TYPE_ALL);
+  cache_hal_suspend(CACHE_LL_LEVEL_EXT_MEM, CACHE_TYPE_ALL);
 }
 
 /****************************************************************************
@@ -907,7 +908,7 @@ static void spi_flash_disable_cache(void)
 
 static void spi_flash_restore_cache(void)
 {
-  cache_hal_resume(CACHE_TYPE_ALL);
+  cache_hal_resume(CACHE_LL_LEVEL_EXT_MEM, CACHE_TYPE_ALL);
 }
 
 #ifdef CONFIG_SMP
@@ -919,7 +920,7 @@ static void spi_flash_restore_cache(void)
  *   Disable the non-IRAM interrupts on the other core (the one that isn't
  *   handling the SPI flash operation) and notify that the SPI flash
  *   operation can start. Wait on a busy loop until it's finished and then
- *   reenable the non-IRAM interrups.
+ *   re-enable the non-IRAM interrupts.
  *
  * Input Parameters:
  *   argc          - Not used.
@@ -1098,7 +1099,7 @@ int esp32s3_mmap(struct spiflash_map_req_s *req)
        start_page < DROM0_PAGES_END;
        ++start_page)
     {
-      if (MMU_TABLE[start_page] == MMU_INVALID)
+      if (MMU_TABLE[start_page] == SOC_MMU_INVALID)
         {
           break;
         }
@@ -1165,7 +1166,7 @@ void esp32s3_ummap(const struct spiflash_map_req_s *req)
 
   for (i = req->start_page; i < req->start_page + req->page_cnt; ++i)
     {
-      MMU_TABLE[i] = MMU_INVALID;
+      MMU_TABLE[i] = SOC_MMU_INVALID;
     }
 
   spiflash_end();

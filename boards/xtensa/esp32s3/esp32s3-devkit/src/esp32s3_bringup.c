@@ -92,7 +92,7 @@
 #  include "esp32s3_efuse.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_LEDC
+#ifdef CONFIG_ESPRESSIF_LEDC
 #  include "esp32s3_board_ledc.h"
 #endif
 
@@ -116,7 +116,7 @@
 #  endif
 #endif
 
-#ifdef CONFIG_ESP32S3_SDMMC
+#if defined(CONFIG_ESP32S3_SDMMC) || defined(CONFIG_MMCSD_SPI)
 #include "esp32s3_board_sdmmc.h"
 #endif
 
@@ -124,7 +124,7 @@
 #  include "esp32s3_aes.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_ADC
+#ifdef CONFIG_ESPRESSIF_ADC
 #include "esp32s3_board_adc.h"
 #endif
 
@@ -139,6 +139,14 @@
 
 #ifdef CONFIG_SYSTEM_NXDIAG_ESPRESSIF_CHIP_WO_TOOL
 #  include "espressif/esp_nxdiag.h"
+#endif
+
+#ifdef CONFIG_ESP_SDM
+#  include "espressif/esp_sdm.h"
+#endif
+
+#ifdef CONFIG_ESPRESSIF_SHA_ACCELERATOR
+#  include "espressif/esp_sha.h"
 #endif
 
 #include "esp32s3-devkit.h"
@@ -213,6 +221,16 @@ int esp32s3_bringup(void)
     }
 #endif
 
+#if defined(CONFIG_ESPRESSIF_SHA_ACCELERATOR) && \
+    !defined(CONFIG_CRYPTO_CRYPTODEV_HARDWARE)
+  ret = esp_sha_init();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR,
+             "ERROR: Failed to initialize SHA: %d\n", ret);
+    }
+#endif
+
 #ifdef CONFIG_FS_PROCFS
   /* Mount the procfs file system */
 
@@ -234,13 +252,13 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_LEDC
+#ifdef CONFIG_ESPRESSIF_LEDC
   ret = esp32s3_pwm_setup();
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: esp32s3_pwm_setup() failed: %d\n", ret);
     }
-#endif /* CONFIG_ESP32S3_LEDC */
+#endif /* CONFIG_ESPRESSIF_LEDC */
 
 #ifdef CONFIG_ESP32S3_TIMER
   /* Configure general purpose timers */
@@ -508,6 +526,14 @@ int esp32s3_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_MMCSD_SPI
+  ret = board_sdmmc_spi_initialize();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to initialize SDMMC: %d\n", ret);
+    }
+#endif
+
 #ifdef CONFIG_ESP32S3_AES_ACCELERATOR
   ret = esp32s3_aes_init();
   if (ret < 0)
@@ -522,13 +548,30 @@ int esp32s3_bringup(void)
 #endif
 #endif
 
-#ifdef CONFIG_ESP32S3_ADC
+#ifdef CONFIG_ESPRESSIF_ADC
   /* Configure ADC */
 
   ret = board_adc_init();
   if (ret)
     {
       syslog(LOG_ERR, "ERROR: board_adc_init() failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_ESP_SDM
+  struct esp_sdm_chan_config_s config =
+  {
+    .gpio_num = 5,
+    .sample_rate_hz = 1000 * 1000,
+    .flags = 0,
+  };
+
+  struct dac_dev_s *dev = esp_sdminitialize(config);
+  ret = dac_register("/dev/dac0", dev);
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "Failed to initialize DAC driver: %d\n",
+             ret);
     }
 #endif
 

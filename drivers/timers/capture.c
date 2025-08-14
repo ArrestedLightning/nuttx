@@ -54,7 +54,7 @@
 /* Debug ********************************************************************/
 
 /****************************************************************************
- * Private Type Definitions
+ * Private Types
  ****************************************************************************/
 
 /* This structure describes the state of the upper half driver */
@@ -311,8 +311,8 @@ static int cap_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
         }
         break;
 
-      /* CAPIOC_FREQUENCE - Get the pulse frequence from the capture.
-       * Argument: int32_t pointer to the location to return the frequence.
+      /* CAPIOC_FREQUENCE - Get the pulse frequency from the capture.
+       * Argument: int32_t pointer to the location to return the frequency.
        */
 
       case CAPIOC_FREQUENCE:
@@ -351,7 +351,7 @@ static int cap_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
         }
         break;
 
-      /* CAPIOC_ALL - Get the pwm duty, pulse frequence, pwm edges, from
+      /* CAPIOC_ALL - Get the pwm duty, pulse frequency, pwm edges, from
        * the capture.
        * Argument: A reference to struct cap_all_s.
        */
@@ -469,30 +469,41 @@ int cap_register(FAR const char *devpath, FAR struct cap_lowerhalf_s *lower)
 }
 
 int cap_register_multiple(FAR const char *devpath,
-                          FAR struct cap_lowerhalf_s **lower, int n)
+                          FAR struct cap_lowerhalf_s **lower,
+                          int n)
 {
-  FAR struct cap_upperhalf_s *upper;
+  char fullpath[32];
+  int ret;
 
-  /* Allocate the upper-half data structure */
-
-  upper = (FAR struct cap_upperhalf_s *)
-           kmm_zalloc(sizeof(struct cap_upperhalf_s));
-  if (!upper)
+  if (!devpath || !lower || n < 1)
     {
-      return -ENOMEM;
+      return -EINVAL;
     }
 
-  /* Initialize the PWM Capture device structure
-   * (it was already zeroed by kmm_zalloc())
-   */
+  for (int i = 0; i < n; i++)
+    {
+      int written = snprintf(fullpath, sizeof(fullpath), "%s%d", devpath, i);
 
-  nxmutex_init(&upper->lock);
-  upper->lower = lower;
-  upper->nchan = n;
+      if (written < 0)
+        {
+          return -EIO;
+        }
 
-  /* Register the PWM Capture device */
+      if ((size_t)written >= sizeof(fullpath))
+        {
+          return -ENAMETOOLONG;
+        }
 
-  return register_driver(devpath, &g_capops, 0666, upper);
+      ret = cap_register(fullpath, lower[i]);
+      if (ret < 0)
+        {
+          /* TODO: unwind */
+
+          return ret;
+        }
+    }
+
+  return OK;
 }
 
 #endif /* CONFIG_CAPTURE */

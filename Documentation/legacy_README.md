@@ -966,7 +966,7 @@ damage your configuration (see
 NuttX also supports kconfiglib(https://github.com/ulfalizer/Kconfiglib) by default,
 which is a Kconfig tool implemented in Python 2/3. Compared with kconfig-frontends,
 kconfiglib provides NuttX with the possibility of multi-platform support(configure
-NuttX in Winodws native/Visual Studio), and also kconfiglib has a stronger Kconfig
+NuttX in Windows native/Visual Studio), and also kconfiglib has a stronger Kconfig
 syntax check, this will help developers to avoid some Kconfig syntax errors.
 Install kconfiglib via following command:
 
@@ -1635,7 +1635,7 @@ tools.  There are, however, complexities in doing that because those tools
 depend on the shell environment and use DLLs that are not found (at least
 not without the correct setup).
 
-Host Compiler:  I use the MingGW GCC compiler which can be downloaded from
+Host Compiler:  I use the MinGW GCC compiler which can be downloaded from
 <http://www.mingw.org/>.  If you are using GNUWin32, then it is recommended
 the you not install the optional MSYS components as there may be conflicts.
 

@@ -298,11 +298,17 @@
       cfg.sinc_scale = I2S_PDM_SIG_SCALING_MUL_1,               \
       cfg.line_mode = I2S_PDM_TX_ONE_LINE_CODEC,                \
       cfg.hp_en = true,                                         \
-      cfg.hp_cut_off_freq_hz = 35.5,                            \
+      cfg.hp_cut_off_freq_hzx10 = 355,                          \
       cfg.sd_dither = 0,                                        \
       cfg.sd_dither2 = 1                                        \
 
 #endif /* CONFIG_ARCH_CHIP_ESP32S3 */
+
+#if !SOC_RCC_IS_INDEPENDENT
+#  define I2S_RCC_ATOMIC() PERIPH_RCC_ATOMIC()
+#else
+#  define I2S_RCC_ATOMIC()
+#endif
 
 #define MIN(x,y) ((x)<(y)?(x):(y))
 
@@ -337,6 +343,7 @@ typedef enum
 struct esp_i2s_config_s
 {
   uint32_t port;                    /* I2S port */
+  periph_module_t module;           /* I2S peripheral module */
   uint32_t role;                    /* I2S port role (master or slave) */
   uint8_t data_width;               /* I2S sample data width */
   uint32_t rate;                    /* I2S sample-rate */
@@ -581,6 +588,7 @@ i2s_hal_clock_info_t clk_info_i2s0 =
 static const struct esp_i2s_config_s esp_i2s0_config =
 {
   .port             = 0,
+  .module           = PERIPH_I2S0_MODULE,
 #ifdef CONFIG_ESPRESSIF_I2S0_ROLE_MASTER
   .role             = I2S_ROLE_MASTER,
 #else
@@ -654,6 +662,7 @@ i2s_hal_clock_info_t clk_info_i2s1 =
 static const struct esp_i2s_config_s esp_i2s1_config =
 {
   .port             = 1,
+  .module           = PERIPH_I2S1_MODULE,
 #ifdef CONFIG_ESPRESSIF_I2S1_ROLE_MASTER
   .role             = I2S_ROLE_MASTER,
 #else
@@ -1236,7 +1245,7 @@ static void IRAM_ATTR i2s_tx_schedule(struct esp_i2s_s *priv,
 
       /* Check if the DMA descriptor that generated an EOF interrupt is the
        * last descriptor of the current buffer container's DMA outlink.
-       * REVISIT: what to do if we miss syncronization and the descriptor
+       * REVISIT: what to do if we miss synchronization and the descriptor
        * that generated the interrupt is different from the expected (the
        * oldest of the list containing active transmissions)?
        */
@@ -1575,10 +1584,13 @@ static void i2s_configure(struct esp_i2s_s *priv)
 
   /* Set peripheral clock and clear reset */
 
-  periph_module_enable(i2s_periph_signal[priv->config->port].module);
+  periph_module_enable(priv->config->module);
 
   i2s_hal_init(priv->config->ctx, priv->config->port);
-  i2s_ll_enable_clock(priv->config->ctx->dev);
+  I2S_RCC_ATOMIC()
+    {
+      i2s_ll_enable_core_clock(priv->config->ctx->dev, true);
+    }
 
   /* Configure multiplexed pins as connected on the board */
 
@@ -1758,7 +1770,7 @@ static void i2s_configure(struct esp_i2s_s *priv)
 #ifdef CONFIG_ARCH_CHIP_ESP32S3
       else
         {
-          i2s_ll_tx_enable_pdm(priv->config->ctx->dev);
+          i2s_ll_tx_enable_pdm(priv->config->ctx->dev, true);
           I2S_PDM_TX_SLOT_DEFAULT_CONFIG(tx_slot_cfg.pdm_tx);
           i2s_hal_pdm_set_tx_slot(priv->config->ctx,
                                   priv->config->role == I2S_ROLE_SLAVE,
@@ -2041,8 +2053,8 @@ static void i2s_set_clock(struct esp_i2s_s *priv)
 
   mclk_div = sclk / mclk;
 
-  i2sinfo("Clock division info: [sclk]%" PRIu32 " Hz [mdiv] %d "
-          "[mclk] %" PRIu32 " Hz [bdiv] %d [bclk] %" PRIu32 " Hz\n",
+  i2sinfo("Clock division info: [sclk]%" PRIu32 " Hz [mdiv] %lu "
+          "[mclk] %" PRIu32 " Hz [bdiv] %" PRIu16 " [bclk] %" PRIu32 " Hz\n",
           sclk, mclk_div, mclk, bclk_div, bclk);
 
   priv->config->clk_info->bclk = bclk;
@@ -2054,13 +2066,15 @@ static void i2s_set_clock(struct esp_i2s_s *priv)
 #ifdef I2S_HAVE_TX
   i2s_hal_set_tx_clock(priv->config->ctx,
                        priv->config->clk_info,
-                       priv->config->tx_clk_src);
+                       priv->config->tx_clk_src,
+                       NULL);
 #endif /* I2S_HAVE_TX */
 
 #ifdef I2S_HAVE_RX
   i2s_hal_set_rx_clock(priv->config->ctx,
                        priv->config->clk_info,
-                       priv->config->rx_clk_src);
+                       priv->config->rx_clk_src,
+                       NULL);
 #endif /* I2S_HAVE_RX */
 }
 
@@ -2085,7 +2099,7 @@ static void i2s_tx_channel_start(struct esp_i2s_s *priv)
     {
       if (priv->tx_started)
         {
-          i2swarn("TX channel of port %d was previously started\n",
+          i2swarn("TX channel of port %" PRIu32 " was previously started\n",
                   priv->config->port);
           return;
         }
@@ -2127,7 +2141,8 @@ static void i2s_tx_channel_start(struct esp_i2s_s *priv)
 
       priv->tx_started = true;
 
-      i2sinfo("Started TX channel of port %d\n", priv->config->port);
+      i2sinfo("Started TX channel of port %" PRIu32 "\n",
+              priv->config->port);
     }
 }
 #endif /* I2S_HAVE_TX */
@@ -2153,7 +2168,7 @@ static void i2s_rx_channel_start(struct esp_i2s_s *priv)
     {
       if (priv->rx_started)
         {
-          i2swarn("RX channel of port %d was previously started\n",
+          i2swarn("RX channel of port %" PRIu32 " was previously started\n",
                   priv->config->port);
           return;
         }
@@ -2195,7 +2210,8 @@ static void i2s_rx_channel_start(struct esp_i2s_s *priv)
 
       priv->rx_started = true;
 
-      i2sinfo("Started RX channel of port %d\n", priv->config->port);
+      i2sinfo("Started RX channel of port %" PRIu32 "\n",
+              priv->config->port);
     }
 }
 #endif /* I2S_HAVE_RX */
@@ -2221,7 +2237,7 @@ static void i2s_tx_channel_stop(struct esp_i2s_s *priv)
     {
       if (!priv->tx_started)
         {
-          i2swarn("TX channel of port %d was previously stopped\n",
+          i2swarn("TX channel of port %" PRIu32 " was previously stopped\n",
                   priv->config->port);
           return;
         }
@@ -2250,7 +2266,8 @@ static void i2s_tx_channel_stop(struct esp_i2s_s *priv)
 
       priv->tx_started = false;
 
-      i2sinfo("Stopped TX channel of port %d\n", priv->config->port);
+      i2sinfo("Stopped TX channel of port %" PRIu32 "\n",
+              priv->config->port);
     }
 }
 #endif /* I2S_HAVE_TX */
@@ -2276,7 +2293,7 @@ static void i2s_rx_channel_stop(struct esp_i2s_s *priv)
     {
       if (!priv->rx_started)
         {
-          i2swarn("RX channel of port %d was previously stopped\n",
+          i2swarn("RX channel of port %" PRIu32 " was previously stopped\n",
                   priv->config->port);
           return;
         }
@@ -2305,7 +2322,8 @@ static void i2s_rx_channel_stop(struct esp_i2s_s *priv)
 
       priv->rx_started = false;
 
-      i2sinfo("Stopped RX channel of port %d\n", priv->config->port);
+      i2sinfo("Stopped RX channel of port %" PRIu32 "\n",
+              priv->config->port);
     }
 }
 #endif /* I2S_HAVE_RX */
@@ -2919,7 +2937,7 @@ static int i2s_receive(struct i2s_dev_s *dev, struct ap_buffer_s *apb,
         }
 
       i2sinfo("Prepared %d bytes to receive DMA buffers\n", apb->nmaxbytes);
-      i2s_dump_buffer("Recieved Audio pipeline buffer:",
+      i2s_dump_buffer("Received Audio pipeline buffer:",
                       &apb->samp[apb->curbyte],
                       apb->nbytes - apb->curbyte);
 
@@ -3187,7 +3205,7 @@ struct i2s_dev_s *esp_i2sbus_initialize(int port)
 
   i2sinfo("port: %d\n", port);
 
-  /* Statically allocated I2S' device strucuture */
+  /* Statically allocated I2S' device structure */
 
   switch (port)
     {
@@ -3247,7 +3265,8 @@ struct i2s_dev_s *esp_i2sbus_initialize(int port)
 
   /* Success exit */
 
-  i2sinfo("I2S%d was successfully initialized\n", priv->config->port);
+  i2sinfo("I2S%" PRIu32 " was successfully initialized\n",
+          priv->config->port);
 
   return &priv->dev;
 

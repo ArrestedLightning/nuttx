@@ -7,6 +7,7 @@ Guides
 
 .. toctree::
   nfs.rst
+  nix_flake.rst
   usbtrace.rst
   simulator.rst
   rndis.rst
@@ -58,4 +59,5 @@ Guides
   reading_can_msgs.rst
   remove_device_drivers_nsh.rst
   rust.rst
+  optee.rst
 

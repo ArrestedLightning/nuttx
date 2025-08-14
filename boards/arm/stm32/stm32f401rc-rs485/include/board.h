@@ -38,7 +38,7 @@
 
 /* Clocking *****************************************************************/
 
-/* The STM32F401RC-RS485 uses an external 32kHz cristal (X2) to enable HSE
+/* The STM32F401RC-RS485 uses an external 32kHz crystal (X2) to enable HSE
  * clock.
  *
  *   System Clock source           : PLL (HSI)
@@ -345,6 +345,16 @@ extern "C"
 /* MFRC522 */
 
 #define GPIO_RFID_CS      (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
+                           GPIO_OUTPUT_SET|GPIO_PORTC|GPIO_PIN5)
+
+/* MAX31855 */
+
+#define GPIO_MAX31855_CS   (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
+                           GPIO_OUTPUT_SET|GPIO_PORTC|GPIO_PIN4)
+
+/* MAX6675 */
+
+#define GPIO_MAX6675_CS    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
                            GPIO_OUTPUT_SET|GPIO_PORTC|GPIO_PIN5)
 /* LEDs
  *

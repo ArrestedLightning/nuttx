@@ -45,13 +45,9 @@
 #include <nuttx/signal.h>
 #include <nuttx/wqueue.h>
 
-#ifndef CONFIG_SENSORS_NAU7802_I2C_FREQUENCY
-#define CONFIG_SENSORS_NAU7802_I2C_FREQUENCY 100000
-#endif
-
-#ifndef CONFIG_SENSORS_NAU7802_THREAD_STACKSIZE
-#define CONFIG_SENSORS_NAU7802_THREAD_STACKSIZE 10000
-#endif
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
 
 /* Registers */
 
@@ -86,6 +82,10 @@
 #define CAL_START 0x2
 #define CAL_ERR 0x3
 
+/****************************************************************************
+ * Private Types
+ ****************************************************************************/
+
 /* ODR to Interval */
 
 static const uint32_t ODR_TO_INTERVAL[] =
@@ -105,6 +105,7 @@ typedef struct
   sem_t run;
   mutex_t devlock;
   bool enabled;
+  uint32_t interval;
   nau7802_odr_e odr;
 } nau7802_dev_s;
 
@@ -117,6 +118,7 @@ typedef struct
  *
  * Description:
  *   Read `nbytes` from the register at `addr` into `buf`.
+ *
  ****************************************************************************/
 
 static int nau7802_read_reg(FAR nau7802_dev_s *dev, uint8_t addr, void *buf,
@@ -147,6 +149,7 @@ static int nau7802_read_reg(FAR nau7802_dev_s *dev, uint8_t addr, void *buf,
  *
  * Description:
  *   Write `nbytes` from `buf` to the registers starting at `addr`.
+ *
  ****************************************************************************/
 
 static int nau7802_write_reg(FAR nau7802_dev_s *dev, uint8_t addr, void *buf,
@@ -174,13 +177,16 @@ static int nau7802_write_reg(FAR nau7802_dev_s *dev, uint8_t addr, void *buf,
 
 /****************************************************************************
  * Name: nau7802_set_bits
+ *
  * Description:
  *   Helper function to set bits in a register.
+ *
  * Arguments:
  *   addr - The address of the register to modify
  *   n_bits - The number of bits to set
  *   n_bit_shifts - The number of bits to shift
  *   value - The value to set
+ *
  ****************************************************************************/
 
 static int nau7802_set_bits(FAR nau7802_dev_s *dev, uint8_t addr,
@@ -276,8 +282,10 @@ static int nau7802_reset(FAR nau7802_dev_s *dev)
 
 /****************************************************************************
  * Name: nau7802_enable
+ *
  * Description:
  *  Enable or disable the NAU7802.
+ *
  ****************************************************************************/
 
 static int nau7802_enable(FAR nau7802_dev_s *dev, bool enable)
@@ -332,8 +340,10 @@ static int nau7802_enable(FAR nau7802_dev_s *dev, bool enable)
 
 /****************************************************************************
  * Name: nau7802_data_available
+ *
  * Description:
  *  Check if data is available over I2C.
+ *
  ****************************************************************************/
 
 static int nau7802_data_available(FAR nau7802_dev_s *dev, bool *val)
@@ -346,6 +356,7 @@ static int nau7802_data_available(FAR nau7802_dev_s *dev, bool *val)
  *
  * Description:
  *  Read the ADC data from the NAU7802 into the sensor_force structure.
+ *
  ****************************************************************************/
 
 static int nau7802_read_data(FAR nau7802_dev_s *dev,
@@ -394,8 +405,10 @@ static int nau7802_read_data(FAR nau7802_dev_s *dev,
 
 /****************************************************************************
  * Name: nau7802_set_ldo
+ *
  * Description:
  *  Set the LDO voltage.
+ *
  ****************************************************************************/
 
 static int nau7802_set_ldo(FAR nau7802_dev_s *dev, nau7802_ldo_e voltage)
@@ -428,11 +441,39 @@ static int nau7802_set_gain(FAR nau7802_dev_s *dev, nau7802_gain_e gain)
  * Name: nau7802_set_interval
  ****************************************************************************/
 
-static int nau7802_set_interval(FAR nau7802_dev_s *dev,
-                                      nau7802_odr_e rate)
+static int nau7802_set_interval(FAR struct sensor_lowerhalf_s *lower,
+                                FAR struct file *filep, uint32_t *period_us)
 {
-  dev->odr = rate;
-  return nau7802_set_bits(dev, REG_CTRL_2, 3, 4, rate);
+  FAR nau7802_dev_s *dev = container_of(lower, FAR nau7802_dev_s, lower);
+
+  if (*period_us >= 100000)
+    {
+      dev->odr = NAU7802_ODR_10HZ;
+    }
+  else if (*period_us >= 50000)
+    {
+      dev->odr = NAU7802_ODR_20HZ;
+    }
+  else if (*period_us >= 25000)
+    {
+      dev->odr = NAU7802_ODR_40HZ;
+    }
+  else if (*period_us >= 12500)
+    {
+      dev->odr = NAU7802_ODR_80HZ;
+    }
+  else if (*period_us >= 3125)
+    {
+      dev->odr = NAU7802_ODR_320HZ;
+    }
+  else
+    {
+      return -EINVAL;
+    }
+
+  dev->interval = *period_us;
+
+  return nau7802_set_bits(dev, REG_CTRL_2, 3, 4, dev->odr);
 }
 
 /****************************************************************************
@@ -441,6 +482,7 @@ static int nau7802_set_interval(FAR nau7802_dev_s *dev,
  * Description:
  *    Reads some data with exclusive device access and pushed it to the UORB
  *    upper half.
+ *
  ****************************************************************************/
 
 static int nau7802_push_data(FAR nau7802_dev_s *dev)
@@ -483,8 +525,10 @@ unlock_ret:
 
 /****************************************************************************
  * Name: nau7802_get_calibvalue
+ *
  * Description:
  *  Get the gain calibration value.
+ *
  ****************************************************************************/
 
 static int nau7802_get_calibvalue(FAR nau7802_dev_s *dev, unsigned long arg)
@@ -527,8 +571,10 @@ static int nau7802_get_calibvalue(FAR nau7802_dev_s *dev, unsigned long arg)
 
 /****************************************************************************
  * Name: nau7802_set_calibvalue
+ *
  * Description:
  *  Set the gain calibration value.
+ *
  ****************************************************************************/
 
 static int nau7802_set_calibvalue(FAR struct sensor_lowerhalf_s *lower,
@@ -571,10 +617,12 @@ static int nau7802_set_calibvalue(FAR struct sensor_lowerhalf_s *lower,
 
 /****************************************************************************
  * Name: nau7802_calibrate
+ *
  * Description:
  *   Perform either an INTERNAL, OFFSET or GAIN calibration.
  *   The gain calibration value is saved and can be retrieved via the
  *   SNIOC_GET_GAIN_CALIBVALUE command
+ *
  ****************************************************************************/
 
 static int nau7802_calibrate(FAR struct sensor_lowerhalf_s *lower,
@@ -669,7 +717,7 @@ static int nau7802_control(FAR struct sensor_lowerhalf_s *lower,
 
     default:
       err = -EINVAL;
-      snerr("Unknown command for NAU7802: lu\n", cmd);
+      snerr("Unknown command for NAU7802: %d\n", cmd);
       break;
     }
 
@@ -726,7 +774,7 @@ static int nau7802_activate(FAR struct sensor_lowerhalf_s *lower,
           return err;
         }
 
-      err = nau7802_set_interval(dev, NAU7802_ODR_10HZ);
+      err = nau7802_set_interval(lower, filep, &dev->interval);
       if (err < 0)
         {
           return err;
@@ -795,6 +843,7 @@ static int nau7802_get_info(FAR struct sensor_lowerhalf_s *lower,
  *
  * Description:
  *   Kernel thread to poll the NAU7802
+ *
  ****************************************************************************/
 
 static int nau7802_thread(int argc, FAR char *argv[])
@@ -826,7 +875,7 @@ static int nau7802_thread(int argc, FAR char *argv[])
 
       /* Wait for next measurement cycle */
 
-      nxsig_usleep(ODR_TO_INTERVAL[dev->odr]);
+      nxsig_usleep(dev->interval);
     }
 
   return err;
@@ -838,7 +887,8 @@ static const struct sensor_ops_s g_sensor_ops =
   .get_info = nau7802_get_info,
   .control = nau7802_control,
   .calibrate = nau7802_calibrate,
-  .set_calibvalue = nau7802_set_calibvalue
+  .set_calibvalue = nau7802_set_calibvalue,
+  .set_interval = nau7802_set_interval
 };
 
 /****************************************************************************
@@ -859,6 +909,7 @@ static const struct sensor_ops_s g_sensor_ops =
  *
  * Returned Value:
  *   Zero (OK) on success; a negated errno value on failure.
+ *
  ****************************************************************************/
 
 int nau7802_register(FAR struct i2c_master_s *i2c, int devno, uint8_t addr)
@@ -893,7 +944,8 @@ int nau7802_register(FAR struct i2c_master_s *i2c, int devno, uint8_t addr)
   priv->lower.ops = &g_sensor_ops;
   priv->lower.type = SENSOR_TYPE_FORCE;
   priv->enabled = false;
-  priv->odr = NAU7802_ODR_10HZ; /* 10Hz (0.1s) default ODR */
+  priv->odr = NAU7802_ODR_10HZ;                /* 10Hz (0.1s) default ODR */
+  priv->interval = ODR_TO_INTERVAL[priv->odr]; /* 100ms default interval */
 
   err = sensor_register(&priv->lower, devno);
   if (err < 0)

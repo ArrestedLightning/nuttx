@@ -1,11 +1,15 @@
-==================
-RaspberryPi rp2350
-==================
+===================
+Raspberry Pi rp2350
+===================
 
-The rp2350 is a dual core chip produced by the RaspberryPi Foundation that
+.. tags:: chip:rp2350
+
+The rp2350 is a dual core chip produced by Raspberry Pi that
 is based on ARM Cortex-M33 or the Hazard3 RISC-V.
 
-For now, only the ARM Cortex-M33 is supported.
+ARM Cortex-M33 and Hazard3 RISC-V cores are supported.
+
+This is ARM Cortex-M33 version of the chip configuration.
 
 This port is experimental and still a work in progress. Use with caution.
 
@@ -21,15 +25,17 @@ Peripheral       Status        Notes
 ==============   ============  =====
 GPIO             Working       See Supported Boards documentation for available pins.
 UART             Working       GPIO 0 (UART0 TX) and GPIO 1 (UART0 RX) are used for the console.
-I2C              Untested
+I2C              Working
 SPI Master       Working
 SPI Slave        Untested
-DMAC             Untested
-PWM              Untested
+DMAC             Working
+PWM              Working
 USB              Experimental  usbnsh configuration is somewhat working with some data corruption
 PIO              Working
 IRQs             Working
-DMA              Untested
+WDOG             Working
+DMA              Working
+FPU/DSP          Experimental  The ostest passing the fpu test, dsp needs some real world testing
 Clock Output     Untested
 Flash ROM Boot   Working       Does not require boot2 from pico-sdk
                                If picotool is available a nuttx.uf2 file will be created

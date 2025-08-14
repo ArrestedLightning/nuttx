@@ -15,10 +15,12 @@ name: Build
 on:
   pull_request:
     paths-ignore:
+      - 'AUTHORS'
       - 'Documentation/**'
       - 'tools/ci/docker/linux/**'
   push:
     paths-ignore:
+      - 'AUTHORS'
       - 'Documentation/**'
     branches:
       - 'releases/*'
@@ -149,7 +151,7 @@ jobs:
     steps:
 
       - name: Download Source Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: source-bundle
           path: .
@@ -217,7 +219,7 @@ jobs:
         boards: ${{ fromJSON(needs.macOS-Arch.outputs.selected_builds) }}
     steps:
       - name: Download Source Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: source-bundle
           path: .
@@ -311,7 +313,7 @@ jobs:
       - run: git config --global core.autocrlf false
 
       - name: Download Source Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: source-bundle
           path: .
@@ -365,7 +367,7 @@ jobs:
       - run: git config --global core.autocrlf false
 
       - name: Download Source Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: source-bundle
           path: .
@@ -373,7 +375,7 @@ jobs:
       - name: Extract sources
         run: |
           7z x sources.tar.gz -y
-          7z x sources.tar -y
+          7z x sources.tar -y -snld
 
       - name: Run Builds
         run: |

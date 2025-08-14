@@ -35,22 +35,22 @@
  ****************************************************************************/
 
 /* Set RGB value for a single module */
-#define KTDIOSETRGB         _PWMIOC(1)
+#define KTDIOSETRGB         _ULEDIOC(0)
 
 /* Set operating mode */
-#define KTDIOSETMODE        _PWMIOC(2)
+#define KTDIOSETMODE        _ULEDIOC(1)
 
 /* Set pattern configuration */
-#define KTDIOSETPATTERN     _PWMIOC(3)
+#define KTDIOSETPATTERN     _ULEDIOC(2)
 
 /* Set pattern slots for a module */
-#define KTDIOSETSLOTS       _PWMIOC(4)
+#define KTDIOSETSLOTS       _ULEDIOC(3)
 
 /* Get monitor register status */
-#define KTDIOGETMONITOR     _PWMIOC(5)
+#define KTDIOGETMONITOR     _ULEDIOC(4)
 
 /* Set watchdog value */
-#define KTDIOSETWDOG        _PWMIOC(6)
+#define KTDIOSETWDOG        _ULEDIOC(5)
 
 /****************************************************************************
  * Public Types
@@ -73,6 +73,13 @@
 #define KTD2052_FADE_RATE_1000MS  5
 #define KTD2052_FADE_RATE_2000MS  6
 #define KTD2052_FADE_RATE_4000MS  7
+
+/* MONITOR status bits */
+
+#define KTD2052_MONITOR_UV_OT_STAT  0x01 /* Under voltage/over temperature */
+#define KTD2052_MONITOR_COOL_STAT   0x02 /* CoolExtend is active */
+#define KTD2052_MONITOR_BE_STAT     0x04 /* BrightExtend is active */
+#define KTD2052_MONITOR_SC_STAT     0x08 /* Short circuit detected */
 
 /* Structure for setting operating mode */
 

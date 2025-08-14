@@ -35,7 +35,6 @@
 #include <nuttx/arch.h>
 
 #include "sched/sched.h"
-#include "signal/signal.h"
 #include "arm64_internal.h"
 #include "arm64_arch.h"
 #include "irq/irq.h"
@@ -73,7 +72,8 @@ static void arm64_init_signal_process(struct tcb_s *tcb, uint64_t *regs)
   tcb->xcp.regs[REG_SP_EL0] = regs[REG_SP_ELX] - XCPTCONTEXT_SIZE * 2;
 #endif
   tcb->xcp.regs[REG_SP_ELX] = regs[REG_SP_ELX] - XCPTCONTEXT_SIZE;
-  tcb->xcp.regs[REG_EXE_DEPTH]  = 1;
+  tcb->xcp.regs[REG_EXE_DEPTH] = 1;
+  tcb->xcp.regs[REG_SCTLR_EL1] = regs[REG_SCTLR_EL1];
 }
 
 /****************************************************************************
@@ -131,8 +131,8 @@ void up_schedule_sigaction(struct tcb_s *tcb)
        * REVISIT:  Signal handler will run in a critical section!
        */
 
-      nxsig_deliver(tcb);
-      tcb->flags &= ~TCB_FLAG_SIGDELIVER;
+      (tcb->sigdeliver)(tcb);
+      tcb->sigdeliver = NULL;
     }
   else
     {

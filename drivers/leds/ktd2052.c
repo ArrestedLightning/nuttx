@@ -82,11 +82,14 @@ struct ktd2052_dev_s
  * Private Function Prototypes
  ****************************************************************************/
 
-static int ktd2052_write_regs(FAR struct ktd2052_dev_s *priv, uint8_t reg_addr,
-                              const uint8_t *reg_vals, uint8_t count);
+static int ktd2052_write_regs(FAR struct ktd2052_dev_s *priv,
+                              uint8_t reg_addr,
+                              const uint8_t *reg_vals,
+                              uint8_t count);
 static int ktd2052_read_reg(FAR struct ktd2052_dev_s *priv, uint8_t reg_addr,
                             uint8_t *reg_val);
-static int ktd2052_write_watchdog(FAR struct ktd2052_dev_s *priv, uint8_t value);
+static int ktd2052_write_watchdog(FAR struct ktd2052_dev_s *priv,
+                                  uint8_t value);
 
 static int ktd2052_open(FAR struct file *filep);
 static int ktd2052_close(FAR struct file *filep);
@@ -132,8 +135,10 @@ static const struct file_operations g_ktd2052_fops =
  *
  ****************************************************************************/
 
-static int ktd2052_write_regs(FAR struct ktd2052_dev_s *priv, uint8_t reg_addr,
-                              const uint8_t *reg_vals, uint8_t count)
+static int ktd2052_write_regs(FAR struct ktd2052_dev_s *priv,
+                              uint8_t reg_addr,
+                              const uint8_t *reg_vals,
+                              uint8_t count)
 {
   struct i2c_msg_s msg[1];
   uint8_t buf[count + 1];
@@ -205,7 +210,8 @@ static int ktd2052_read_reg(FAR struct ktd2052_dev_s *priv, uint8_t reg_addr,
  *
  ****************************************************************************/
 
-static int ktd2052_write_watchdog(FAR struct ktd2052_dev_s *priv, uint8_t value)
+static int ktd2052_write_watchdog(FAR struct ktd2052_dev_s *priv,
+                                  uint8_t value)
 {
   int ret;
 
@@ -237,8 +243,9 @@ static int ktd2052_write_watchdog(FAR struct ktd2052_dev_s *priv, uint8_t value)
  *
  ****************************************************************************/
 
-static FAR struct ktd2052_dev_s *ktd2052_initialize(FAR struct i2c_master_s *i2c,
-                                                    uint8_t addr, uint32_t freq)
+static FAR
+struct ktd2052_dev_s *ktd2052_initialize(FAR struct i2c_master_s *i2c,
+                                         uint8_t addr, uint32_t freq)
 {
   FAR struct ktd2052_dev_s *priv;
   uint8_t reg_val;
@@ -246,7 +253,8 @@ static FAR struct ktd2052_dev_s *ktd2052_initialize(FAR struct i2c_master_s *i2c
 
   /* Allocate device structure */
 
-  priv = (FAR struct ktd2052_dev_s *)kmm_malloc(sizeof(struct ktd2052_dev_s));
+  priv = (FAR struct ktd2052_dev_s *)kmm_malloc(
+                                              sizeof(struct ktd2052_dev_s));
   if (!priv)
     {
       return NULL;
@@ -381,8 +389,10 @@ static int ktd2052_set_mode(FAR struct ktd2052_dev_s *priv, uint8_t mode,
  *
  ****************************************************************************/
 
-static int ktd2052_setup_pattern(FAR struct ktd2052_dev_s *priv, uint8_t slots,
-                                 uint8_t duration, uint8_t fade_rate1,
+static int ktd2052_setup_pattern(FAR struct ktd2052_dev_s *priv,
+                                 uint8_t slots,
+                                 uint8_t duration,
+                                 uint8_t fade_rate1,
                                  uint8_t watchdog)
 {
   uint8_t mode;
@@ -455,7 +465,9 @@ static int ktd2052_set_pattern_slots(FAR struct ktd2052_dev_s *priv,
       return -EINVAL;
     }
 
-  return ktd2052_write_regs(priv, KTD2052_PG_RGB1_REG + (module - 1), &slots, 1);
+  return ktd2052_write_regs(priv,
+                            KTD2052_PG_RGB1_REG + (module - 1),
+                            &slots, 1);
 }
 
 /****************************************************************************
@@ -521,7 +533,8 @@ static ssize_t ktd2052_read(FAR struct file *filep, FAR char *buffer,
     {
       /* Read status register */
 
-      ret = ktd2052_read_reg(priv, KTD2052_MONITOR_REG, (uint8_t *)&buffer[0]);
+      ret = ktd2052_read_reg(priv, KTD2052_MONITOR_REG,
+                             (uint8_t *)&buffer[0]);
       if (ret < 0)
         {
           return ret;
@@ -550,7 +563,7 @@ static ssize_t ktd2052_read(FAR struct file *filep, FAR char *buffer,
  * Name: ktd2052_write
  *
  * Description:
- *   Write will write directly to the RGB values for LED modules 1-4.  Partial
+ *   Write will write directly to the RGB values for LED modules 1-4. Partial
  *   writes are allowed.  It expects 1-12 bytes in the format:
  *   [red] [green] [blue] [red] [green] [blue] etc
  ****************************************************************************/
@@ -569,8 +582,8 @@ static ssize_t ktd2052_write(FAR struct file *filep, FAR const char *buffer,
 
   /* Set the RGB values */
 
-  ret = ktd2052_write_regs(priv, KTD2052_IRED1_REG, (const uint8_t *)&buffer[0],
-                           buflen);
+  ret = ktd2052_write_regs(priv, KTD2052_IRED1_REG,
+                           (const uint8_t *)&buffer[0], buflen);
   if (ret < 0)
     {
       return ret;
@@ -636,8 +649,10 @@ static int ktd2052_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
               break;
             }
 
-          ret = ktd2052_setup_pattern(priv, pattern->slots, pattern->duration,
-                                      pattern->fade_rate1, pattern->watchdog);
+          ret = ktd2052_setup_pattern(priv, pattern->slots,
+                                      pattern->duration,
+                                      pattern->fade_rate1,
+                                      pattern->watchdog);
         }
         break;
 
@@ -645,7 +660,8 @@ static int ktd2052_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
         {
           /* Set pattern slots for a module */
 
-          FAR struct ktd2052_slots_s *slots = (FAR struct ktd2052_slots_s *)arg;
+          FAR struct ktd2052_slots_s *slots =
+                                          (FAR struct ktd2052_slots_s *)arg;
           if (slots == NULL)
             {
               ret = -EINVAL;

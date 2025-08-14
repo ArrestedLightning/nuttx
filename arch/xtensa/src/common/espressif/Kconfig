@@ -21,12 +21,52 @@ config ESP_PCNT
 	default n
 	select CAPTURE
 
+config ESPRESSIF_ADC
+	bool "Analog-to-digital converter (ADC)"
+	default n
+	select ANALOG
+	select ADC
+	---help---
+		Enable support for analog-to-digital converter (ADC) peripheral.
+
+if ESPRESSIF_ADC
+
+config ESPRESSIF_ADC_1
+	default y
+	bool "Enable SAR ADC 1"
+
+config ESPRESSIF_ADC_2
+	default n
+	bool "Enable SAR ADC 2"
+
+endif # ESPRESSIF_ADC
+
 config ESPRESSIF_TEMP
 	bool "Internal Temperature Sensor"
 	default n
 	depends on ARCH_CHIP_ESP32S2 || ARCH_CHIP_ESP32S3
 	---help---
 		A built-in sensor used to measure the chip's internal temperature.
+
+config ESP_SDM
+	bool "Sigma-Delta Modulation (SDM) Module"
+	default n
+	select ANALOG
+	select DAC
+
+config ESPRESSIF_LEDC
+	bool "LEDC (PWM)"
+	default n
+	depends on ARCH_CHIP_ESP32S2 || ARCH_CHIP_ESP32S3
+	select PWM
+	select ARCH_HAVE_PWM_MULTICHAN
+
+config ESPRESSIF_SHA_ACCELERATOR
+	bool "SHA Accelerator"
+	depends on !ARCH_CHIP_ESP32
+	default n
+	---help---
+		Enable SHA accelerator support.
 
 config ESPRESSIF_I2S
 	bool
@@ -109,6 +149,194 @@ config ESPRESSIF_SPIFLASH
 	depends on ARCH_CHIP_ESP32S2
 	default n
 
+config ESPRESSIF_DEDICATED_GPIO
+	bool "Dedicated GPIO"
+	depends on !ARCH_CHIP_ESP32
+	default n
+	---help---
+		Enable dedicated GPIO support for faster response time.
+		Dedicated GPIO is suitable for faster response times required
+		applications like simulate serial/parallel interfaces in a bit-banging way.
+		It can work as pin grouping and you can use any pin up to 8 pins for
+		input and 8 pins for output for dedicated gpio in total.
+
+config ESPRESSIF_DEDICATED_GPIO_IRQ
+	bool "Dedicated GPIO IRQ"
+	depends on ESPRESSIF_DEDICATED_GPIO && ARCH_CHIP_ESP32S2
+	default n
+	---help---
+		Enable dedicated GPIO IRQ support
+
+menu "LEDC configuration"
+	depends on ESPRESSIF_LEDC
+
+config ESPRESSIF_LEDC_HPOINT
+	hex "LEDC hpoint value"
+	default 0x0000
+	range 0x0 1048575
+	---help---
+		This value sets the start point of the pulse within each timer period,
+		measured in timer ticks. It allows adjusting the phase of the signal.
+
+menuconfig ESPRESSIF_LEDC_TIMER0
+	bool "Timer 0"
+	default n
+
+if ESPRESSIF_LEDC_TIMER0
+
+config ESPRESSIF_LEDC_TIMER0_CHANNELS
+	int "Number of Timer 0 channels"
+	default 2 if PWM_MULTICHAN && PWM_NCHANNELS > 1
+	default 1 if !PWM_MULTICHAN || PWM_NCHANNELS = 1
+	range 0 6
+
+config ESPRESSIF_LEDC_TIMER0_RESOLUTION
+	int "Timer 0 resolution"
+	default 12
+	range 1 14
+	---help---
+		Timer resolution in bits. The resolution is the number of bits used to by the timer
+		counter to generate the PWM signal. The duty cycle provided by the upper layers
+		will be scaled to fit the resolution.
+
+endif # ESPRESSIF_LEDC_TIMER0
+
+menuconfig ESPRESSIF_LEDC_TIMER1
+	bool "Timer 1"
+	default n
+
+if ESPRESSIF_LEDC_TIMER1
+
+config ESPRESSIF_LEDC_TIMER1_CHANNELS
+	int "Number of Timer 1 channels"
+	default 2 if PWM_MULTICHAN && PWM_NCHANNELS > 1
+	default 1 if !PWM_MULTICHAN || PWM_NCHANNELS = 1
+	range 0 6
+
+config ESPRESSIF_LEDC_TIMER1_RESOLUTION
+	int "Timer 1 resolution"
+	default 12
+	range 1 14
+	---help---
+		Timer resolution in bits. The resolution is the number of bits used to by the timer
+		counter to generate the PWM signal. The duty cycle provided by the upper layers
+		will be scaled to fit the resolution.
+
+endif # ESPRESSIF_LEDC_TIMER1
+
+menuconfig ESPRESSIF_LEDC_TIMER2
+	bool "Timer 2"
+	default n
+
+if ESPRESSIF_LEDC_TIMER2
+
+config ESPRESSIF_LEDC_TIMER2_CHANNELS
+	int "Number of Timer 2 channels"
+	default 2 if PWM_MULTICHAN && PWM_NCHANNELS > 1
+	default 1 if !PWM_MULTICHAN || PWM_NCHANNELS = 1
+	range 0 6
+
+config ESPRESSIF_LEDC_TIMER2_RESOLUTION
+	int "Timer 2 resolution"
+	default 12
+	range 1 14
+	---help---
+		Timer resolution in bits. The resolution is the number of bits used to by the timer
+		counter to generate the PWM signal. The duty cycle provided by the upper layers
+		will be scaled to fit the resolution.
+
+endif # ESPRESSIF_LEDC_TIMER2
+
+menuconfig ESPRESSIF_LEDC_TIMER3
+	bool "Timer 3"
+	default n
+
+if ESPRESSIF_LEDC_TIMER3
+
+config ESPRESSIF_LEDC_TIMER3_CHANNELS
+	int "Number of Timer 3 channels"
+	default 2 if PWM_MULTICHAN && PWM_NCHANNELS > 1
+	default 1 if !PWM_MULTICHAN || PWM_NCHANNELS = 1
+	range 0 6
+
+config ESPRESSIF_LEDC_TIMER3_RESOLUTION
+	int "Timer 3 resolution"
+	default 12
+	range 1 14
+	---help---
+		Timer resolution in bits. The resolution is the number of bits used to by the timer
+		counter to generate the PWM signal. The duty cycle provided by the upper layers
+		will be scaled to fit the resolution.
+
+endif # ESPRESSIF_LEDC_TIMER3
+
+if !ESP32S2_LEDC && !ESP32S3_LEDC
+
+config ESPRESSIF_LEDC_CHANNEL0_PIN
+	int "Channel 0 pin"
+	default 2
+	range 0 48 if ARCH_CHIP_ESP32S3
+	range 0 46 if ARCH_CHIP_ESP32S2
+
+config ESPRESSIF_LEDC_CHANNEL1_PIN
+	int "Channel 1 pin"
+	default 3
+	range 0 48 if ARCH_CHIP_ESP32S3
+	range 0 46 if ARCH_CHIP_ESP32S2
+
+config ESPRESSIF_LEDC_CHANNEL2_PIN
+	int "Channel 2 pin"
+	default 4
+	range 0 48 if ARCH_CHIP_ESP32S3
+	range 0 46 if ARCH_CHIP_ESP32S2
+
+config ESPRESSIF_LEDC_CHANNEL3_PIN
+	int "Channel 3 pin"
+	default 5
+	range 0 48 if ARCH_CHIP_ESP32S3
+	range 0 46 if ARCH_CHIP_ESP32S2
+
+if PWM_MULTICHAN && PWM_NCHANNELS > 1
+
+config ESPRESSIF_LEDC_CHANNEL4_PIN
+	int "Channel 4 pin"
+	default 6
+	range 0 48 if ARCH_CHIP_ESP32S3
+	range 0 46 if ARCH_CHIP_ESP32S2
+
+config ESPRESSIF_LEDC_CHANNEL5_PIN
+	int "Channel 5 pin"
+	default 7
+	range 0 48 if ARCH_CHIP_ESP32S3
+	range 0 46 if ARCH_CHIP_ESP32S2
+
+config ESPRESSIF_LEDC_CHANNEL6_PIN
+	int "Channel 6 pin"
+	default 8
+	range 0 48 if ARCH_CHIP_ESP32S3
+	range 0 46 if ARCH_CHIP_ESP32S2
+
+config ESPRESSIF_LEDC_CHANNEL7_PIN
+	int "Channel 7 pin"
+	default 9
+	range 0 48 if ARCH_CHIP_ESP32S3
+	range 0 46 if ARCH_CHIP_ESP32S2
+
+endif # PWM_MULTICHAN && PWM_NCHANNELS > 1
+
+endif # !ESP32_LEDC && !ESP32S2_LEDC && !ESP32S3_LEDC
+
+endmenu # LEDC configuration
+
+menu "Bootloader and Image Configuration"
+
+config ESPRESSIF_BOOTLOADER_MCUBOOT
+	bool
+	---help---
+		Enables the Espressif port of MCUboot to be used as 2nd stage bootloader.
+
+endmenu # Bootloader and Image Configuration
+
 menu "Pulse Counter (PCNT) Configuration"
 	depends on ESP_PCNT
 
@@ -120,9 +348,27 @@ config ESP_PCNT_TEST_MODE
 		to the receiver internally, being able to test the PCNT
 		peripheral without any external connection.
 
+config ESP_PCNT_HIGH_LIMIT
+	int "PCNT high limit value"
+	default 1024
+	range 1 32767
+	---help---
+		This sets thr_h_lim value for all units. When pulse_cnt reaches
+		this value, the counter will be cleared.
+
+config ESP_PCNT_LOW_LIMIT
+	int "PCNT low limit value"
+	default -1024
+	range -32768 -1
+	---help---
+		This sets thr_l_lim value for all units. When pulse_cnt reaches
+		this value, the counter will be cleared.
+
 config ESP_PCNT_AS_QE
 	bool
 	default n
+	select SENSORS
+	select SENSORS_QENCODER
 
 config ESP_PCNT_U0
 	bool "Enable PCNT Unit 0"
@@ -142,15 +388,15 @@ config ESP_PCNT_U0_CH0_EDGE_PIN
 
 config ESP_PCNT_U0_CH0_LEVEL_PIN
 	int "PCNT_U0 CH0 Level/Control Pin Number"
-	default 4 if !ESP_PCNT_U0_QE
-	default -1 if ESP_PCNT_U0_QE
+	default 4
 	range -1 39
+	depends on !ESP_PCNT_U0_QE
 
 config ESP_PCNT_U0_CH1_EDGE_PIN
 	int "PCNT_U0 CH1 Edge/Pulse Pin Number"
-	default 0 if !ESP_PCNT_U0_QE
-	default -1 if ESP_PCNT_U0_QE
+	default 0
 	range -1 39
+	depends on !ESP_PCNT_U0_QE
 
 config ESP_PCNT_U0_CH1_LEVEL_PIN
 	int "PCNT_U0 CH1 Level/Control Pin Number"
@@ -934,10 +1180,10 @@ menu "Wi-Fi Configuration"
 	depends on ESPRESSIF_WIFI
 
 config ESPRESSIF_WLAN
-        bool "WLAN"
+	bool "WLAN"
 	default y
 	---help---
-	        Enable WLAN support
+		Enable WLAN support
 
 menu "ESP WPA-Supplicant"
 
@@ -985,11 +1231,18 @@ config ESPRESSIF_WIFI_STATION_SOFTAP
 
 endchoice # ESP Wi-Fi mode
 
-config ESP_WIFI_ENABLE_SAE_PK
+config ESPRESSIF_WIFI_ENABLE_SAE_PK
 	bool "Enable SAE-PK"
 	default y
+	depends on ESP_WIFI_ENABLE_SAE_H2E
 	---help---
 		Select this option to enable SAE-PK
+
+config ESPRESSIF_WIFI_ENABLE_SAE_H2E
+	bool "Enable SAE-H2E"
+	default y
+	---help---
+		Select this option to enable SAE-H2E
 
 config ESP_WIFI_ENABLE_WPA3_OWE_STA
 	bool "Enable OWE STA"
@@ -1133,7 +1386,7 @@ config ESPRESSIF_ESPNOW_PKTRADIO_FRAMELEN
 	range 127 250
 	default 196
 	---help---
-		Frame size used for espnow transmitions. Ensure that this is
+		Frame size used for espnow transmissions. Ensure that this is
 		set equal for all nodes.
 
 config ESPRESSIF_ESPNOW_PKTRADIO_PANID
@@ -1144,11 +1397,11 @@ config ESPRESSIF_ESPNOW_PKTRADIO_PANID
 		PANID for espnow pktradio.
 
 config ESPRESSIF_ESPNOW_PKTRADIO_PANADDR
-       hex "ESPNOW pktradio node address"
-       range 0x0 0xffff
-       default 0xfffe
-       ---help---
-                PANADDRESS for espnow pktradio.
+	hex "ESPNOW pktradio node address"
+	range 0x0 0xffff
+	default 0xfffe
+	---help---
+		PANADDRESS for espnow pktradio.
 
 endif #ESPRESSIF_ESPNOW_PKTRADIO
 

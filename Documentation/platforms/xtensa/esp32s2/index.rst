@@ -13,6 +13,7 @@ ESP32-S2 Toolchain
 ==================
 
 The toolchain used to build ESP32-S2 firmware can be either downloaded or built from the sources.
+
 It is **highly** recommended to use (download or build) the same toolchain version that is being
 used by the NuttX CI.
 
@@ -26,20 +27,12 @@ check for the current compiler version being used. For instance:
   # Build image for tool required by ESP32 builds
   ###############################################################################
   FROM nuttx-toolchain-base AS nuttx-toolchain-esp32
-  # Download the latest ESP32 GCC toolchain prebuilt by Espressif
-  RUN mkdir -p xtensa-esp32-elf-gcc && \
-    curl -s -L "https://github.com/espressif/crosstool-NG/releases/download/esp-12.2.0_20230208/xtensa-esp32-elf-12.2.0_20230208-x86_64-linux-gnu.tar.xz" \
-    | tar -C xtensa-esp32-elf-gcc --strip-components 1 -xJ
+  # Download the latest ESP32, ESP32-S2 and ESP32-S3 GCC toolchain prebuilt by Espressif
+  RUN mkdir -p xtensa-esp-elf-gcc && \
+    curl -s -L "https://github.com/espressif/crosstool-NG/releases/download/esp-14.2.0_20241119/xtensa-esp-elf-14.2.0_20241119-x86_64-linux-gnu.tar.xz" \
+    | tar -C xtensa-esp-elf-gcc --strip-components 1 -xJ
 
-  RUN mkdir -p xtensa-esp32s2-elf-gcc && \
-    curl -s -L "https://github.com/espressif/crosstool-NG/releases/download/esp-12.2.0_20230208/xtensa-esp32s2-elf-12.2.0_20230208-x86_64-linux-gnu.tar.xz" \
-    | tar -C xtensa-esp32s2-elf-gcc --strip-components 1 -xJ
-
-  RUN mkdir -p xtensa-esp32s3-elf-gcc && \
-    curl -s -L "https://github.com/espressif/crosstool-NG/releases/download/esp-12.2.0_20230208/xtensa-esp32s3-elf-12.2.0_20230208-x86_64-linux-gnu.tar.xz" \
-    | tar -C xtensa-esp32s3-elf-gcc --strip-components 1 -xJ
-
-For ESP32-S2, the toolchain version is based on GGC 12.2.0 (``xtensa-esp32s2-elf-12.2.0_20230208``)
+For ESP32-S2, the toolchain version is based on GGC 14.2.0 (``xtensa-esp-elf-14.2.0_20241119``)
 
 The prebuilt Toolchain (Recommended)
 ------------------------------------
@@ -48,20 +41,20 @@ First, create a directory to hold the toolchain:
 
 .. code-block:: console
 
-  $ mkdir -p /path/to/your/toolchain/xtensa-esp32s2-elf-gcc
+  $ mkdir -p /path/to/your/toolchain/xtensa-esp-elf-gcc
 
 Download and extract toolchain:
 
 .. code-block:: console
 
-  $ curl -s -L "https://github.com/espressif/crosstool-NG/releases/download/esp-12.2.0_20230208/xtensa-esp32s2-elf-12.2.0_20230208-x86_64-linux-gnu.tar.xz" \
-  | tar -C xtensa-esp32s2-elf-gcc --strip-components 1 -xJ
+  $ curl -s -L "https://github.com/espressif/crosstool-NG/releases/download/esp-14.2.0_20241119/xtensa-esp-elf-14.2.0_20241119-x86_64-linux-gnu.tar.xz" \
+  | tar -C xtensa-esp-elf-gcc --strip-components 1 -xJ
 
 Add the toolchain to your `PATH`:
 
 .. code-block:: console
 
-  $ echo "export PATH=/path/to/your/toolchain/xtensa-esp32s2-elf-gcc/bin:$PATH" >> ~/.bashrc
+  $ echo "export PATH=/path/to/your/toolchain/xtensa-esp-elf-gcc/bin:$PATH" >> ~/.bashrc
 
 You can edit your shell's rc files if you don't use bash.
 
@@ -231,7 +224,13 @@ directly to the ESP32-S2 JTAG pins.
 
 OpenOCD can then be used::
 
-  openocd -c 'set ESP_RTOS hwthread; set ESP_FLASH_SIZE 0' -f board/esp32s2-kaluga-1.cfg
+  openocd -s <tcl_scripts_path> -c 'set ESP_RTOS hwthread' -f board/esp32s2-kaluga-1.cfg -c 'init; reset halt; esp appimage_offset 0x1000'
+
+.. note::
+  - ``appimage_offset`` should be set to ``0x1000`` when ``Simple Boot`` is used. For MCUboot, this value should be set to
+    ``CONFIG_ESPRESSIF_OTA_PRIMARY_SLOT_OFFSET`` value (``0x10000`` by default).
+  - ``-s <tcl_scripts_path>`` defines the path to the OpenOCD scripts. Usually set to `tcl` if running openocd from its source directory.
+    It can be omitted if `openocd-esp32` were installed in the system with `sudo make install`.
 
 Once OpenOCD is running, you can use GDB to connect to it and debug your application::
 
@@ -376,13 +375,13 @@ The following list indicates the state of peripherals' support in NuttX:
 ========== ======= =====
 Peripheral Support NOTES
 ========== ======= =====
-ADC          No
+ADC          Yes   Oneshot
 AES          No
 CAN/TWAI     Yes
 DAC          No
 DMA          Yes
 eFuse        Yes
-GPIO         Yes
+GPIO         Yes    Dedicated GPIO supported
 I2C          Yes    Master and Slave mode supported
 I2S          Yes
 LED/PWM      Yes
@@ -391,7 +390,8 @@ RMT          Yes
 RNG          Yes
 RSA          No
 RTC          Yes
-SHA          No
+SD/MMC       Yes    SPI based SD card driver
+SHA          Yes
 SPI          Yes
 SPIFLASH     Yes
 SPIRAM       Yes
@@ -547,6 +547,40 @@ audio subsystem and develop specific usages of the I2S peripheral.
 
 Please check for usage examples using the :doc:`ESP32-S2-Saola-1 </platforms/xtensa/esp32s2/boards/esp32s2-saola-1/index>`.
 
+Analog-to-digital converter (ADC)
+=================================
+
+Two ADC units are available for the ESP32-S2, each with 10 channels.
+
+Those units are independent and can be used simultaneously. During bringup, GPIOs for selected channels are
+configured automatically to be used as ADC inputs.
+If available, ADC calibration is automatically applied (see
+`this page <https://docs.espressif.com/projects/esp-idf/en/v5.1/esp32s2/api-reference/peripherals/adc_calibration.html>`__ for more details).
+Otherwise, a simple conversion is applied based on the attenuation and resolution.
+
+Each ADC unit is accessible using the ADC character driver, which returns data for the enabled channels.
+
+The ADC unit can be enabled in the menu :menuselection:`System Type --> ESP32-S2 Peripheral Selection --> Analog-to-digital converter (ADC)`.
+
+Then, it can be customized in the menu :menuselection:`System Type --> ADC Configuration`, which includes operating mode, gain and channels.
+
+========== =========== ===========
+ Channel    ADC1 GPIO   ADC2 GPIO
+========== =========== ===========
+0           1           11
+1           2           12
+2           3           13
+3           4           14
+4           5           15
+5           6           16
+6           7           17
+7           8           18
+8           9           19
+9           10          20
+========== =========== ===========
+
+.. warning:: Minimum and maximum measurable voltages may saturate around 100 mV and 3000 mV, respectively.
+
 Wi-Fi
 ======
 
@@ -591,11 +625,100 @@ using WPA2.
 
 The ``dhcpd_start`` is necessary to let your board to associate an IP to your smartphone.
 
+.. _MCUBoot and OTA Update S2:
+
+MCUBoot and OTA Update
+======================
+
+The ESP32-S2 supports over-the-air (OTA) updates using MCUBoot.
+
+Read more about the MCUBoot for Espressif devices `here <https://docs.mcuboot.com/readme-espressif.html>`__.
+
+Executing OTA Update
+--------------------
+
+This section describes how to execute OTA update using MCUBoot.
+
+1. First build the default ``mcuboot_update_agent`` config. This image defaults to the primary slot and already comes with Wi-Fi settings enabled::
+
+    ./tools/configure.sh esp32s2-saola-1:mcuboot_update_agent
+
+2. Build the MCUBoot bootloader::
+
+    make bootloader
+
+3. Finally, build the application image::
+
+    make
+
+Flash the image to the board and verify it boots ok.
+It should show the message "This is MCUBoot Update Agent image" before NuttShell is ready.
+
+At this point, the board should be able to connect to Wi-Fi so we can download a new binary from our network::
+
+  NuttShell (NSH) NuttX-12.4.0
+  This is MCUBoot Update Agent image
+  nsh>
+  nsh> wapi psk wlan0 <wifi_ssid> 3
+  nsh> wapi essid wlan0 <wifi_password> 1
+  nsh> renew wlan0
+
+Now, keep the board as is and execute the following commands to **change the MCUBoot target slot to the 2nd slot**
+and modify the message of the day (MOTD) as a mean to verify the new image is being used.
+
+1. Change the MCUBoot target slot to the 2nd slot::
+
+    kconfig-tweak -d CONFIG_ESPRESSIF_ESPTOOL_TARGET_PRIMARY
+    kconfig-tweak -e CONFIG_ESPRESSIF_ESPTOOL_TARGET_SECONDARY
+    kconfig-tweak --set-str CONFIG_NSH_MOTD_STRING "This is MCUBoot UPDATED image!"
+    make olddefconfig
+
+  .. note::
+    The same changes can be accomplished through ``menuconfig`` in :menuselection:`System Type --> Bootloader and Image Configuration --> Target slot for image flashing`
+    for MCUBoot target slot and in :menuselection:`System Type --> Bootloader and Image Configuration --> Search (motd) --> NSH Library --> Message of the Day` for the MOTD.
+
+2. Rebuild the application image::
+
+    make
+
+At this point the board is already connected to Wi-Fi and has the primary image flashed.
+The new image configured for the 2nd slot is ready to be downloaded.
+
+To execute OTA, create a simple HTTP server on the NuttX directory so we can access the binary remotely::
+
+  cd nuttxspace/nuttx
+  python3 -m http.server
+   Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+
+On the board, execute the update agent, setting the IP address to the one on the host machine. Wait until image is transferred and the board should reboot automatically::
+
+  nsh> mcuboot_agent http://10.42.0.1:8000/nuttx.bin
+  MCUboot Update Agent example
+  Downloading from http://10.42.0.1:8000/nuttx.bin
+  Firmware Update size: 1048576 bytes
+  Received: 512      of 1048576 bytes [0%]
+  Received: 1024     of 1048576 bytes [0%]
+  Received: 1536     of 1048576 bytes [0%]
+  [.....]
+  Received: 1048576  of 1048576 bytes [100%]
+  Application Image successfully downloaded!
+  Requested update for next boot. Restarting...
+
+NuttShell should now show the new MOTD, meaning the new image is being used::
+
+  NuttShell (NSH) NuttX-12.4.0
+  This is MCUBoot UPDATED image!
+  nsh>
+
+Finally, the image is loaded but not confirmed.
+To make sure it won't rollback to the previous image, you must confirm with ``mcuboot_confirm`` and reboot the board.
+The OTA is now complete.
+
 Secure Boot and Flash Encryption
-================================
+--------------------------------
 
 Secure Boot
------------
+^^^^^^^^^^^
 
 Secure Boot protects a device from running any unauthorized (i.e., unsigned) code by checking that
 each piece of software that is being booted is signed. On an ESP32-S2, these pieces of software include
@@ -623,7 +746,7 @@ The Secure Boot process on the ESP32-S2 involves the following steps performed:
    by MCUboot rather than the original NuttX port.
 
 Flash Encryption
-----------------
+^^^^^^^^^^^^^^^^
 
 Flash encryption is intended for encrypting the contents of the ESP32-S2's off-chip flash memory. Once this feature is enabled,
 firmware is flashed as plaintext, and then the data is encrypted in place on the first boot. As a result, physical readout
@@ -635,7 +758,7 @@ of flash will not be sufficient to recover most flash contents.
    `here <https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/security/flash-encryption.html>`__.
 
 Prerequisites
--------------
+^^^^^^^^^^^^^
 
 First of all, we need to install ``imgtool`` (a MCUboot utility application to manipulate binary
 images) and ``esptool`` (the ESP32-S2 toolkit)::
@@ -659,7 +782,7 @@ respectively, of the compiled project::
 .. important:: The contents of the key files must be stored securely and kept secret.
 
 Enabling Secure Boot and Flash Encryption
------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To enable Secure Boot for the current project, go to the project's NuttX directory, execute ``make menuconfig`` and the following steps:
 

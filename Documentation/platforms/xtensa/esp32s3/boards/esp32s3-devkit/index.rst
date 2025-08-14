@@ -2,6 +2,8 @@
 ESP32S3-DevKit
 ==============
 
+.. tags:: chip:esp32, chip:esp32s3
+
 The `ESP32S3 DevKit <https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/hw-reference/esp32s3/user-guide-devkitc-1.html>`_ is a development board for the ESP32-S3 SoC from Espressif, based on a ESP32-S3-WROOM-1 module.
 
 .. list-table::
@@ -81,6 +83,27 @@ All of the configurations presented below can be tested by running the following
 Where <config_name> is the name of board configuration you want to use, i.e.: nsh, buttons, wifi...
 Then use a serial console terminal like ``picocom`` configured to 115200 8N1.
 
+adc
+---
+
+The ``adc`` configuration enables the ADC driver and the ADC example application.
+ADC Unit 1 is registered to ``/dev/adc0`` with channels 0, 1, 2 and 3 enabled by default.
+Currently, the ADC operates in oneshot mode.
+
+More ADC channels can be enabled or disabled in ``ADC Configuration`` menu.
+
+This example shows channels 0 and 1 connected to 3.3 V and channels 2 and 3 to GND (all readings
+show in units of mV)::
+
+    nsh> adc -n 1
+    adc_main: g_adcstate.count: 1
+    adc_main: Hardware initialized. Opening the ADC device: /dev/adc0
+    Sample:
+    1: channel: 0 value: 3061
+    2: channel: 1 value: 3061
+    3: channel: 2 value: 106
+    4: channel: 3 value: 99
+
 audio
 -----
 
@@ -158,9 +181,9 @@ the following output is expected::
     cap_main: Hardware initialized. Opening the capture device: /dev/capture0
     cap_main: Number of samples: 0
     pwm duty cycle: 50 %
-    pwm frequence: 50 Hz
+    pwm frequency: 50 Hz
     pwm duty cycle: 50 %
-    pwm frequence: 50 Hz
+    pwm frequency: 50 Hz
 
 coremark
 --------
@@ -171,6 +194,24 @@ disables the NuttShell to get the best possible score.
 
 .. note:: As the NSH is disabled, the application will start as soon as the
   system is turned on.
+
+crypto
+------
+
+This configuration enables support for the cryptographic hardware and
+the ``/dev/crypto`` device file. Currently, we are supporting SHA-1,
+SHA-224 and SHA-256 algorithms using hardware.
+To test hardware acceleration, you can use `hmac` example and following output
+should look like this::
+
+    nsh> hmac
+    ...
+    hmac sha1 success
+    hmac sha1 success
+    hmac sha1 success
+    hmac sha256 success
+    hmac sha256 success
+    hmac sha256 success
 
 cxx
 ---
@@ -233,6 +274,41 @@ interrupt fires::
 
 The pin is configured to trigger an interrupt on the rising edge, so after
 issuing the above command, connect it to 3.3V.
+
+To use dedicated gpio for controlling multiple gpio pin at the same time
+or having better response time, you need to enable
+`CONFIG_ESPRESSIF_DEDICATED_GPIO` option. Dedicated GPIO is suitable
+for faster response times required applications like simulate serial/parallel
+interfaces in a bit-banging way.
+After this option enabled GPIO4 and GPIO5 pins are ready to used as dedicated GPIO pins
+as input/output mode. These pins are for example, you can use any pin up to 8 pins for
+input and 8 pins for output for dedicated gpio.
+To write and read data from dedicated gpio, you need to use
+`write` and `read` calls.
+
+The following snippet demonstrates how to read/write to dedicated GPIO pins:
+
+.. code-block:: C
+
+    int fd; = open("/dev/dedic_gpio0", O_RDWR);
+    int rd_val = 0;
+    int wr_mask = 0xffff;
+    int wr_val = 3;
+
+    while(1)
+      {
+        write(fd, &wr_val, wr_mask);
+        if (wr_val == 0)
+          {
+            wr_val = 3;
+          }
+        else
+          {
+            wr_val = 0;
+          }
+        read(fd, &rd_val, sizeof(uint32_t));
+        printf("rd_val: %d", rd_val);
+      }
 
 i2c
 ---
@@ -316,6 +392,123 @@ Flash and PSRAM).
 .. warning:: The World Controller and Permission Control **do not** prevent
   the application from accessing CPU System Registers.
 
+mbedtls
+-------
+
+This configuration is to test mbedtls.
+
+A benchmark result::
+
+  MD5                      :      13300 KiB/s,          0 cycles/byte
+  RIPEMD160                :       5658 KiB/s,          0 cycles/byte
+  SHA-1                    :       6460 KiB/s,          0 cycles/byte
+  SHA-256                  :       3358 KiB/s,          0 cycles/byte
+  SHA-512                  :       1519 KiB/s,          0 cycles/byte
+  SHA3-224                 :        473 KiB/s,          2 cycles/byte
+  SHA3-256                 :        472 KiB/s,          2 cycles/byte
+  SHA3-384                 :        382 KiB/s,          2 cycles/byte
+  SHA3-512                 :        256 KiB/s,          3 cycles/byte
+  3DES                     :        712 KiB/s,          1 cycles/byte
+  DES                      :       1743 KiB/s,          0 cycles/byte
+  3DES-CMAC                :        665 KiB/s,          1 cycles/byte
+  AES-CBC-128              :       3002 KiB/s,          0 cycles/byte
+  AES-CBC-192              :       2656 KiB/s,          0 cycles/byte
+  AES-CBC-256              :       2365 KiB/s,          0 cycles/byte
+  AES-CFB128-128           :       2815 KiB/s,          0 cycles/byte
+  AES-CFB128-192           :       2499 KiB/s,          0 cycles/byte
+  AES-CFB128-256           :       2262 KiB/s,          0 cycles/byte
+  AES-CFB8-128             :        207 KiB/s,          4 cycles/byte
+  AES-CFB8-192             :        181 KiB/s,          5 cycles/byte
+  AES-CFB8-256             :        161 KiB/s,          6 cycles/byte
+  AES-CTR-128              :       2894 KiB/s,          0 cycles/byte
+  AES-CTR-192              :       2567 KiB/s,          0 cycles/byte
+  AES-CTR-256              :       2317 KiB/s,          0 cycles/byte
+  AES-XTS-128              :       2827 KiB/s,          0 cycles/byte
+  AES-XTS-256              :       2261 KiB/s,          0 cycles/byte
+  AES-GCM-128              :        643 KiB/s,          1 cycles/byte
+  AES-GCM-192              :        627 KiB/s,          1 cycles/byte
+  AES-GCM-256              :        612 KiB/s,          1 cycles/byte
+  AES-CCM-128              :       1350 KiB/s,          0 cycles/byte
+  AES-CCM-192              :       1207 KiB/s,          0 cycles/byte
+  AES-CCM-256              :       1087 KiB/s,          0 cycles/byte
+  ChaCha20-Poly1305        :       2093 KiB/s,          0 cycles/byte
+  AES-CMAC-128             :       2654 KiB/s,          0 cycles/byte
+  AES-CMAC-192             :       2376 KiB/s,          0 cycles/byte
+  AES-CMAC-256             :       2134 KiB/s,          0 cycles/byte
+  AES-CMAC-PRF-128         :       2644 KiB/s,          0 cycles/byte
+  ARIA-CBC-128             :       1329 KiB/s,          0 cycles/byte
+  ARIA-CBC-192             :       1140 KiB/s,          0 cycles/byte
+  ARIA-CBC-256             :       1015 KiB/s,          0 cycles/byte
+  CAMELLIA-CBC-128         :       1904 KiB/s,          0 cycles/byte
+  CAMELLIA-CBC-192         :       1515 KiB/s,          0 cycles/byte
+  CAMELLIA-CBC-256         :       1518 KiB/s,          0 cycles/byte
+  ChaCha20                 :       2732 KiB/s,          0 cycles/byte
+  Poly1305                 :      11615 KiB/s,          0 cycles/byte
+  CTR_DRBG (NOPR)          :       2336 KiB/s,          0 cycles/byte
+  CTR_DRBG (PR)            :       1607 KiB/s,          0 cycles/byte
+  HMAC_DRBG SHA-1 (NOPR)   :        441 KiB/s,          2 cycles/byte
+  HMAC_DRBG SHA-1 (PR)     :        408 KiB/s,          2 cycles/byte
+  HMAC_DRBG SHA-256 (NOPR) :        339 KiB/s,          2 cycles/byte
+  HMAC_DRBG SHA-256 (PR)   :        342 KiB/s,          2 cycles/byte
+  RSA-2048                 :      42  public/s
+  RSA-2048                 :       2 private/s
+  RSA-3072                 :      20  public/s
+  RSA-3072                 :       1 private/s
+  RSA-4096                 :      11  public/s
+  RSA-4096                 :       0 private/s
+  DHE-2048                 :       0 handshake/s
+  DH-2048                  :       0 handshake/s
+  DHE-3072                 :       0 handshake/s
+  DH-3072                  :       0 handshake/s
+  ECDSA-secp521r1          :       4 sign/s
+  ECDSA-brainpoolP512r1    :       1 sign/s
+  ECDSA-secp384r1          :       5 sign/s
+  ECDSA-brainpoolP384r1    :       1 sign/s
+  ECDSA-secp256r1          :      11 sign/s
+  ECDSA-secp256k1          :       9 sign/s
+  ECDSA-brainpoolP256r1    :       2 sign/s
+  ECDSA-secp224r1          :      16 sign/s
+  ECDSA-secp224k1          :      11 sign/s
+  ECDSA-secp192r1          :      21 sign/s
+  ECDSA-secp192k1          :      13 sign/s
+  ECDSA-secp521r1          :       2 verify/s
+  ECDSA-brainpoolP512r1    :       0 verify/s
+  ECDSA-secp384r1          :       3 verify/s
+  ECDSA-brainpoolP384r1    :       1 verify/s
+  ECDSA-secp256r1          :       6 verify/s
+  ECDSA-secp256k1          :       5 verify/s
+  ECDSA-brainpoolP256r1    :       1 verify/s
+  ECDSA-secp224r1          :       8 verify/s
+  ECDSA-secp224k1          :       6 verify/s
+  ECDSA-secp192r1          :      11 verify/s
+  ECDSA-secp192k1          :       7 verify/s
+  ECDHE-secp521r1          :       2 ephemeral handshake/s
+  ECDHE-brainpoolP512r1    :       0 ephemeral handshake/s
+  ECDHE-secp384r1          :       3 ephemeral handshake/s
+  ECDHE-brainpoolP384r1    :       1 ephemeral handshake/s
+  ECDHE-secp256r1          :       6 ephemeral handshake/s
+  ECDHE-secp256k1          :       5 ephemeral handshake/s
+  ECDHE-brainpoolP256r1    :       1 ephemeral handshake/s
+  ECDHE-secp224r1          :       8 ephemeral handshake/s
+  ECDHE-secp224k1          :       6 ephemeral handshake/s
+  ECDHE-secp192r1          :      12 ephemeral handshake/s
+  ECDHE-secp192k1          :       7 ephemeral handshake/s
+  ECDHE-x25519             :       6 ephemeral handshake/s
+  ECDHE-x448               :       2 ephemeral handshake/s
+  ECDH-secp521r1           :       4 static handshake/s
+  ECDH-brainpoolP512r1     :       1 static handshake/s
+  ECDH-secp384r1           :       6 static handshake/s
+  ECDH-brainpoolP384r1     :       1 static handshake/s
+  ECDH-secp256r1           :      11 static handshake/s
+  ECDH-secp256k1           :      10 static handshake/s
+  ECDH-brainpoolP256r1     :       2 static handshake/s
+  ECDH-secp224r1           :      17 static handshake/s
+  ECDH-secp224k1           :      11 static handshake/s
+  ECDH-secp192r1           :      23 static handshake/s
+  ECDH-secp192k1           :      14 static handshake/s
+  ECDH-x25519              :      12 static handshake/s
+  ECDH-x448                :       5 static handshake/s
+
 motor
 -------
 
@@ -334,6 +527,14 @@ mcuboot_nsh
 This configuration is the same as the ``nsh`` configuration, but it generates the application
 image in a format that can be used by MCUboot. It also makes the ``make bootloader`` command to
 build the MCUboot bootloader image using the Espressif HAL.
+
+mcuboot_update_agent
+--------------------
+
+This configuration is used to represent an MCUboot image that contains an update agent
+to perform over-the-air (OTA) updates. Wi-Fi settings are already enabled and image confirmation program is included.
+
+Follow the instructions in the :ref:`MCUBoot and OTA Update <MCUBoot and OTA Update S3>` section to execute OTA update.
 
 nsh
 ---
@@ -415,7 +616,7 @@ To test it, just run the ``oneshot`` example::
 qencoder
 ---
 
-This configuration demostrates the use of Quadrature Encoder connected to pins
+This configuration demonstrates the use of Quadrature Encoder connected to pins
 GPIO10 and GPIO11. You can start measurement of pulses using the following
 command (by default, it will open ``\dev\qe0`` device and print 20 samples
 using 1 second delay)::
@@ -634,6 +835,19 @@ You can set an alarm, check its progress and receive a notification after it exp
     Alarm 0 is active with 10 seconds to expiration
     nsh> alarm_daemon: alarm 0 received
 
+sdm
+---
+
+This configuration enables the support for the Sigma-Delta Modulation (SDM) driver
+which can be used for LED dimming, simple dac with help of an low pass filter either
+active or passive and so on. ESP32-S3 supports 1 group of SDM up to 8 channels with
+any GPIO up to user. This configuration enables 1 channel of SDM on GPIO5. You can test
+DAC feature with following command with connecting simple LED on GPIO5
+
+    nsh> dac -d 100 -s 10 test
+
+After this command you will see LED will light up in different brightness.
+
 sdmmc
 -----
 
@@ -681,6 +895,39 @@ Format and mount the SD/MMC device with following commands::
 
 FAT filesystem is enabled in the default configuration. Other filesystems may
 also work.
+
+sdmmc_spi
+---------
+
+This configuration is used to mount a FAT/FAT32 SD Card into the OS' filesystem.
+It uses SPI to communicate with the SD Card, defaulting to SPI2.
+
+The SD slot number, SPI port number and minor number can be modified in ``Application Configuration → NSH Library``.
+
+To access the card's files, make sure ``/dev/mmcsd0`` exists and then execute the following commands::
+
+    nsh> ls /dev
+    /dev:
+    console
+    mmcsd0
+    null
+    ttyS0
+    zero
+    nsh> mount -t vfat /dev/mmcsd0 /mnt
+
+This will mount the SD Card to ``/mnt``. Now, you can use the SD Card as a normal filesystem.
+For example, you can read a file and write to it::
+
+    nsh> ls /mnt
+    /mnt:
+    hello.txt
+    nsh> cat /mnt/hello.txt
+    Hello World
+    nsh> echo 'NuttX RTOS' >> /mnt/hello.txt
+    nsh> cat /mnt/hello.txt
+    Hello World!
+    NuttX RTOS
+    nsh>
 
 smp
 ---
@@ -967,8 +1214,8 @@ To test it, just run the following::
 fastboot
 --------
 
-The basic Fastboot configuration is based on esp32s3-devkit:usb_device.
-More details about usage of fastboot, please refer to `fastbootd — NuttX latest documentation <https://nuttx.apache.org/docs/latest/applications/system/fastboot/index.html>`_.
+| The Fastboot configuration is based on esp32s3-devkit:usb_device and esp32s3-devkit:wifi, and support both **USB** and **TCP** network transport.
+| More details about usage of fastboot, please refer to `fastbootd — NuttX latest documentation <https://nuttx.apache.org/docs/latest/applications/system/fastboot/index.html>`_.
 
 You can run the configuration and compilation procedure::
 
@@ -981,14 +1228,36 @@ To test it, just run the following (**Default is host side**):
 
     sudo apt install fastboot
 
-2. List devices running fastboot::
+2. Specify a device / List devices:
+
+  List devices only supported for USB transport::
 
     fastboot devices
 
-  Example::
+    # Examples
 
     $ fastboot devices
     1234    fastboot
+
+  To specific a device, use "-s" option::
+
+    # Usage
+    #
+    #   -s tcp:HOST[:PORT]         Specify a TCP network device.
+    #   -s SERIAL                  Specify a USB device.
+
+    fastboot -s SERIAL COMMAND
+    fastboot -s tcp:HOST[:PORT] COMMAND
+
+    # Examples
+
+    $ fastboot -s 1234 oem shell ifconfig
+    wlan0   Link encap:Ethernet HWaddr a0:85:e3:f4:43:30 at RUNNING mtu 1500
+            inet addr:192.168.211.111 DRaddr:192.168.211.107 Mask:255.255.255.0
+
+    PS C:\workspace> fastboot.exe -s tcp:192.168.211.111 oem shell ifconfig
+    wlan0   Link encap:Ethernet HWaddr a0:85:e3:f4:43:30 at RUNNING mtu 1500
+            inet addr:192.168.211.111 DRaddr:192.168.211.107 Mask:255.255.255.0
 
 3. Display given variable::
 
@@ -1046,3 +1315,45 @@ To test it, just run the following (**Default is host side**):
     0050: 44 ff c9 3b 55 51 93 b3 fb 1e 88 9e e9 2d 69 36 D..;UQ.......-i6
     0060: 10 d0 70 27 92 91 32 25 f5 cc 1f 59 ea 39 31 24 ..p'..2%...Y.91$
     0070: 3f 2e b0 fe ef 87 df 9b d4 7d 79 2e de 64 f6 ed ?........}y..d..
+
+fastboot_usb
+------------
+
+| The basic Fastboot configuration is based on esp32s3-devkit:usb_device and support **USB** transport only.
+| More details about usage of fastboot, please refer to `fastbootd — NuttX latest documentation <https://nuttx.apache.org/docs/latest/applications/system/fastboot/index.html>`_.
+
+You can run the configuration and compilation procedure::
+
+  $ ./tools/configure.sh -l lckfb-szpi-esp32s3:fastboot_usb
+  $ make flash ESPTOOL_PORT=/dev/ttyACMx -j
+
+fastboot_tcp
+------------
+
+| The basic Fastboot configuration is based on esp32s3-devkit:wifi and support **TCP** transport only.
+| More details about usage of fastboot, please refer to `fastbootd — NuttX latest documentation <https://nuttx.apache.org/docs/latest/applications/system/fastboot/index.html>`_.
+
+You can run the configuration and compilation procedure::
+
+    $ ./tools/configure.sh -l esp32s3-devkit:fastboot_tcp
+    $ make flash ESPTOOL_PORT=/dev/ttyACMx -j
+
+To test it, just run the following::
+
+    # Device side
+
+    nsh> wapi psk wlan0 mypasswd 3
+    nsh> wapi essid wlan0 myssid 1
+    nsh> renew wlan0
+
+    # Host side
+
+    PS C:\workspace> fastboot.exe -s tcp:HOST[:PORT] oem shell ls
+    /:
+     data/
+     dev/
+     etc/
+     proc/
+     var/
+    OKAY [  0.063s]
+    Finished. Total time: 0.064s

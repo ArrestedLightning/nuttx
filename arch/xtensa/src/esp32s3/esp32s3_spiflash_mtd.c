@@ -236,7 +236,7 @@ static inline bool IRAM_ATTR stack_is_psram(void)
 #endif
 
 /**
- * Choose type of chip you want to encrypt manully
+ * Choose type of chip you want to encrypt manually
  *
  * esp-idf/components/hal/esp32s3/include/hal/spi_flash_encrypted_ll.h
  *
@@ -294,7 +294,7 @@ static inline void spi_flash_encrypt_ll_disable(void)
  * Name: spi_flash_encrypt_ll_type
  *
  * Description:
- *   Choose type of chip you want to encrypt manully
+ *   Choose type of chip you want to encrypt manually
  *
  * Input Parameters:
  *   type - The type of chip to be encrypted
@@ -857,7 +857,7 @@ static int esp32s3_async_op(enum spiflash_op_code_e opcode,
   ret = work_queue(LPWORK, &g_work, esp32s3_spiflash_work, &work_arg, 0);
   if (ret == 0)
     {
-      nxsem_wait(&work_arg.sem);
+      nxsem_wait_uninterruptible(&work_arg.sem);
       ret = work_arg.ret;
     }
 
@@ -1222,7 +1222,7 @@ static int esp32s3_writedata_encrypt(struct mtd_dev_s *dev, off_t offset,
  *   buffer - data buffer pointer
  *
  * Returned Value:
- *   Writen bytes if success or a negative value if fail.
+ *   Written bytes if success or a negative value if fail.
  *
  ****************************************************************************/
 
@@ -1252,8 +1252,8 @@ static ssize_t esp32s3_write_encrypt(struct mtd_dev_s *dev, off_t offset,
 
   for (n = 0; n < nbytes; n += step)
     {
-      /* The temporary buffer need to be seperated into
-       * 16-bytes, 32-bytes, 64-bytes(if supported).
+      /* The temporary buffer needs to be separated into
+       * 16-bytes, 32-bytes, 64-bytes (if supported).
        */
 
       addr = offset + n;
@@ -1304,7 +1304,7 @@ static ssize_t esp32s3_write_encrypt(struct mtd_dev_s *dev, off_t offset,
  *   buffer - data buffer pointer
  *
  * Returned Value:
- *   Writen bytes if success or a negative value if fail.
+ *   Written bytes if success or a negative value if fail.
  *
  ****************************************************************************/
 
@@ -1375,7 +1375,7 @@ static ssize_t esp32s3_write(struct mtd_dev_s *dev, off_t offset,
  *   buffer     - data buffer pointer
  *
  * Returned Value:
- *   Writen block number if success or a negative value if fail.
+ *   Written block number if success or a negative value if fail.
  *
  ****************************************************************************/
 
@@ -1440,7 +1440,7 @@ static ssize_t esp32s3_bwrite_encrypt(struct mtd_dev_s *dev,
  *   buffer     - data buffer pointer
  *
  * Returned Value:
- *   Writen block number if success or a negative value if fail.
+ *   Written block number if success or a negative value if fail.
  *
  ****************************************************************************/
 

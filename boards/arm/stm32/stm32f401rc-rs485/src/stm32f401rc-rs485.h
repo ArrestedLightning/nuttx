@@ -94,14 +94,14 @@
 #define GPIO_BTN_SW5 \
   (GPIO_INPUT |GPIO_FLOAT |GPIO_EXTI | GPIO_PORTB | GPIO_PIN15)
 
-/* OLED SSD1309 */
+/* LCD SSD1309 or ST7735 */
 
-#if defined(CONFIG_LCD_SSD1306)
-#  define GPIO_OLED_RESET (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
+#if defined(CONFIG_LCD_SSD1306) || defined(CONFIG_LCD_ST7735)
+#  define GPIO_LCD_RESET (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
                            GPIO_OUTPUT_CLEAR|GPIO_PORTB|GPIO_PIN6)
-#  define GPIO_OLED_CS    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
+#  define GPIO_LCD_CS    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
                            GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN7)
-#  define GPIO_OLED_DC    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
+#  define GPIO_LCD_DC    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_50MHz|\
                            GPIO_OUTPUT_CLEAR|GPIO_PORTB|GPIO_PIN8)
 #endif
 
@@ -158,6 +158,15 @@
                            GPIO_OUTPUT_SET | GPIO_PORTB | GPIO_PIN0)
 #define GPIO_INT1         (GPIO_INPUT | GPIO_PULLDOWN | GPIO_SPEED_2MHz | \
                            GPIO_PORTC | GPIO_PIN4)
+
+/* HX711 PINs */
+#ifdef CONFIG_ADC_HX711
+#  define HX711_CLK_PIN  (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_OUTPUT_SET|\
+                          GPIO_SPEED_2MHz|GPIO_PULLUP|\
+                          GPIO_PORTB|GPIO_PIN1)
+#  define HX711_DATA_PIN (GPIO_INPUT|GPIO_SPEED_2MHz|GPIO_PULLUP|GPIO_EXTI|\
+                          GPIO_PORTB|GPIO_PIN2)
+#endif /* CONFIG_ADC_HX711 */
 
 /****************************************************************************
  * Public Data
@@ -303,6 +312,18 @@ int stm32_gpio_initialize(void);
 
 #ifdef CONFIG_ADC
 int stm32_adc_setup(void);
+#endif
+
+/****************************************************************************
+ * Name: stm32_hx711_initialize
+ *
+ * Description:
+ *   Initialize hx711 chip
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_ADC_HX711
+int stm32_hx711_initialize(void);
 #endif
 
 #endif /* __BOARDS_ARM_STM32_STM32F401RC_RS485_SRC_STM32F401RC_RS485_H */

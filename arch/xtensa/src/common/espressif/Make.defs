@@ -42,6 +42,10 @@ ifeq ($(CONFIG_ESPRESSIF_TEMP),y)
 CHIP_CSRCS += esp_temperature_sensor.c
 endif
 
+ifeq ($(CONFIG_ESP_SDM),y)
+CHIP_CSRCS += esp_sdm.c
+endif
+
 ifeq ($(CONFIG_ESPRESSIF_I2S),y)
 CHIP_CSRCS += esp_i2s.c
 endif
@@ -61,6 +65,10 @@ CHIP_CSRCS += esp_qencoder.c
 endif
 endif
 
+ifeq ($(CONFIG_ESPRESSIF_LEDC),y)
+CHIP_CSRCS += esp_ledc.c
+endif
+
 ifeq ($(CONFIG_ESPRESSIF_SPIFLASH),y)
 CHIP_CSRCS += esp_spiflash.c
 ifeq ($(CONFIG_ESPRESSIF_MTD),y)
@@ -70,6 +78,17 @@ endif
 
 ifeq ($(CONFIG_ESPRESSIF_I2C_PERIPH_SLAVE_MODE),y)
 CHIP_CSRCS += esp_i2c_slave.c
+endif
+
+ifeq ($(CONFIG_ESPRESSIF_DEDICATED_GPIO),y)
+CHIP_CSRCS += esp_dedic_gpio.c
+endif
+
+ifeq ($(CONFIG_ESPRESSIF_SHA_ACCELERATOR),y)
+CHIP_CSRCS += esp_sha.c
+ifeq ($(CONFIG_CRYPTO_CRYPTODEV_HARDWARE),y)
+CHIP_CSRCS += esp_crypto.c
+endif
 endif
 
 ifeq ($(CONFIG_SYSTEM_NXDIAG_ESPRESSIF_CHIP_WO_TOOL),y)
@@ -86,6 +105,10 @@ ifeq ($(CONFIG_ESPRESSIF_ESPNOW_PKTRADIO), y)
 CHIP_CSRCS += esp_espnow_pktradio.c
 EXTRA_LIBS += -lespnow
 endif
+endif
+
+ifeq ($(CONFIG_ESPRESSIF_ADC),y)
+CHIP_CSRCS += esp_adc.c
 endif
 
 ifeq ($(CONFIG_ESPRESSIF_WIRELESS),y)

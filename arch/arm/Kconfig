@@ -45,7 +45,7 @@ config ARM_TOOLCHAIN_CLANG
 
 config ARM_TOOLCHAIN_ARMCLANG
 	bool "ARM Compiler Clang toolchain"
-	select ARCH_TOOLCHAIN_CLANG
+	select ARCH_TOOLCHAIN_ARMCLANG
 
 config ARM_TOOLCHAIN_GHS
 	bool "ARM Compiler Green Hills Software toolchain"
@@ -387,6 +387,8 @@ config ARCH_CHIP_RP23XX
 	select ARCH_HAVE_MULTICPU
 	select ARCH_HAVE_I2CRESET
 	select ARM_HAVE_WFE_SEV
+	select ARM_HAVE_DSP
+	select ARCH_HAVE_FPU
 	select ARCH_HAVE_CUSTOM_TESTSET
 	select ARCH_HAVE_PWM_MULTICHAN
 	select ARCH_BOARD_COMMON
@@ -515,6 +517,7 @@ config ARCH_CHIP_STM32L0
 config ARCH_CHIP_STM32G0
 	bool "STMicro STM32 G0"
 	select ARCH_CORTEXM0
+	select ARCH_HAVE_PROGMEM
 	---help---
 		STMicro STM32G0 architectures (ARM Cortex-M0+).
 
@@ -949,6 +952,7 @@ config ARCH_ARMV7A
 	bool
 	default n
 	select ARCH_HAVE_CPUINFO
+	select ARCH_HAVE_DEBUG
 	select ARCH_HAVE_PERF_EVENTS
 	select ARM_HAVE_WFE_SEV
 
@@ -1485,7 +1489,7 @@ config ARM_SEMIHOSTING_HOSTFS_CACHE_COHERENCE
 	bool "Cache coherence in semihosting hostfs"
 	depends on ARCH_DCACHE
 	---help---
-		Flush & Invalidte cache before & after bkpt instruction.
+		Flush & Invalidate cache before & after bkpt instruction.
 
 endif # ARM_SEMIHOSTING_HOSTFS
 

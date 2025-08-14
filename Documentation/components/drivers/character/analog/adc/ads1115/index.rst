@@ -106,7 +106,7 @@ Configuration
    * - CONFIG_ADC_ADS1115_PGA
      - Gain of the ADS1115
    * - CONFIG_ADC_ADS1115_CONTINOUS
-     - Continous mode of the ADS1115
+     - Continuous mode of the ADS1115
    * - CONFIG_ADC_ADS1115_DR
      - Data rate of the ADS1115
    * - CONFIG_ADC_ADS1115_COMP_MODE
@@ -197,7 +197,7 @@ be of type ads1115_pga_e, which corresponds to the gain seen above.
 
 .. c:macro:: ANIOC_ADS1115_SET_MODE
 
-This command changes the ADS1115 to operate in continous or single-shot mode. 
+This command changes the ADS1115 to operate in continuous or single-shot mode.
 
 .. c:macro:: ANIOC_ADS1115_SET_DR
 
@@ -230,3 +230,18 @@ of type uint16_t, which corresponds to the HIGH_THRESH register value.
 
 This command changes the LOW_THRESH register of the ADS1115. The argument passed should be 
 of type uint16_t, which corresponds to the LOW_THRESH register value.
+
+.. c:macro:: ANIOC_ADS1115_READ_CHANNEL
+
+This command reads a value from a specific channel of the ADS1115. The argument passed should
+be a pointer to a struct adc_msg_s.
+
+.. c:macro:: ANIOC_ADS1115_TRIGGER_CONVERSION
+
+This command triggers an analog conversion on the ADS1115. The argument passed should be a pointer to a ``struct
+adc_msg_s``, where the member ``am_channel`` is initialized to the channel number the conversion should be started for.
+
+.. c:macro:: ANIOC_ADS1115_READ_CHANNEL_NO_CONVERSION
+
+This command reads the result of the last conversion on the ADS1115. The argument passed should be a pointer to a
+``struct adc_msg_s``, where the result of the conversion will be stored.
