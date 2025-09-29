@@ -404,6 +404,10 @@ static inline int ramtron_pagewrite(struct ramtron_dev_s *priv,
                                     FAR const uint8_t *buffer,
                                     off_t offset,
                                     size_t pagesize);
+static inline int ramtron_bytewrite(struct ramtron_dev_s *priv,
+                                    FAR const uint8_t *buffer,
+                                    off_t offset,
+                                    size_t nbytes);
 
 /* MTD driver methods */
 
@@ -617,38 +621,12 @@ static inline int ramtron_pagewrite(struct ramtron_dev_s *priv,
 
   finfo("page: %08lx offset: %08lx\n", (long)page, (long)offset);
 
-  /* Enable the write access to the FLASH */
-
-  ramtron_writeenable(priv);
-
-  /* Select this FLASH part */
-
-  SPI_SELECT(priv->dev, SPIDEV_FLASH(priv->devid), true);
-
-  /* Send "Page Program (PP)" command */
-
-  SPI_SEND(priv->dev, RAMTRON_WRITE);
-
-  /* Send the page offset high byte first. */
-
-  ramtron_sendaddr(priv, offset);
-
-  /* Then write the specified number of bytes */
-
-  SPI_SNDBLOCK(priv->dev, buffer, pagesize);
-
-  /* Deselect the FLASH: Chip Select high */
-
-  SPI_SELECT(priv->dev, SPIDEV_FLASH(priv->devid), false);
-  finfo("Written\n");
-
-  return OK;
+  return ramtron_bytewrite(priv, buffer, offset, pagesize);
 }
 
 /****************************************************************************
  * Name:  ramtron_bytewrite
  ****************************************************************************/
-#ifdef CONFIG_MTD_BYTE_WRITE
 static inline int ramtron_bytewrite(struct ramtron_dev_s *priv,
                                     FAR const uint8_t *buffer, off_t offset,
                                     size_t nbytes)
@@ -683,7 +661,6 @@ static inline int ramtron_bytewrite(struct ramtron_dev_s *priv,
 
   return OK;
 }
-#endif
 
 /****************************************************************************
  * Name: ramtron_erase
@@ -1043,7 +1020,9 @@ FAR struct mtd_dev_s *ramtron_initialize(FAR struct spi_dev_s *dev,
       priv->mtd.bread  = ramtron_bread;
       priv->mtd.bwrite = ramtron_bwrite;
       priv->mtd.read   = ramtron_read;
+#ifdef CONFIG_MTD_BYTE_WRITE
       priv->mtd.write  = ramtron_write;
+#endif
       priv->mtd.ioctl  = ramtron_ioctl;
       priv->mtd.name   = "ramtron";
       priv->dev        = dev;
