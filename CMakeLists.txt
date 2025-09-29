@@ -53,6 +53,13 @@ if(POLICY CMP0169)
   cmake_policy(SET CMP0169 OLD)
 endif()
 
+# Find Python 3 interpreter
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+if(NOT Python3_Interpreter_FOUND)
+  message(FATAL_ERROR "Did NOT find Python interpreter.")
+endif()
+
 # Basic CMake configuration ##################################################
 
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -157,6 +164,22 @@ endif()
 if(NOT EXISTS "${NUTTX_DEFCONFIG}")
   message(FATAL_ERROR "No config file found at ${NUTTX_DEFCONFIG}")
 endif()
+
+# Process initial defconfig ###################################################
+# Process initial defconfig to recursively expand #include in it
+
+include(nuttx_process_config)
+get_filename_component(NUTTX_DEFCONFIG_DIR "${NUTTX_DEFCONFIG}" DIRECTORY)
+process_config(
+  ${CMAKE_BINARY_DIR}/.defconfig.processed
+  ${NUTTX_DEFCONFIG}
+  INCLUDE_PATHS
+  ${NUTTX_DEFCONFIG_DIR}/../../common/configs
+  ${NUTTX_DEFCONFIG_DIR}/../common
+  ${NUTTX_DEFCONFIG_DIR}
+  ${NUTTX_DIR}/../apps
+  ${NUTTX_DIR}/../nuttx-apps)
+set(NUTTX_DEFCONFIG ${CMAKE_BINARY_DIR}/.defconfig.processed)
 
 # Generate initial .config ###################################################
 # This is needed right before any other configure step so that we can source
@@ -431,16 +454,66 @@ endif()
 # Setup platform options (this needs to happen after project(), once the
 # toolchain file has been processed)
 
-# Support custom Toolchain options by custom Boards
-if(CONFIG_ARCH_BOARD_CUSTOM)
-  if(EXISTS ${NUTTX_BOARD_ABS_DIR}/cmake
-     AND EXISTS ${NUTTX_BOARD_ABS_DIR}/cmake/Toolchain.cmake)
-    # must be added AFTER ToolchainFile and BEFORE platform
-    include(${NUTTX_BOARD_ABS_DIR}/cmake/Toolchain.cmake)
-  endif()
+# Support board Toolchain options
+if(EXISTS ${NUTTX_BOARD_ABS_DIR}/cmake
+   AND EXISTS ${NUTTX_BOARD_ABS_DIR}/cmake/Toolchain.cmake)
+  # must be added AFTER ToolchainFile and BEFORE platform
+  include(${NUTTX_BOARD_ABS_DIR}/cmake/Toolchain.cmake)
 endif()
 
 include(platform)
+
+if(CONFIG_ARCH_TOOLCHAIN_TASKING)
+  if(CONFIG_INTELHEX_BINARY)
+    add_link_options(-Wl-onuttx.hex:IHEX:4 --hex-format=s)
+  endif()
+
+  if(CONFIG_MOTOROLA_SREC)
+    add_link_options(-Wl-onuttx.srec:SREC:4)
+  endif()
+endif()
+
+if(MSVC)
+  add_compile_options(
+    -W2
+    -wd4116 # unnamed type definition in parentheses
+    -wd4146 # unary minus operator applied to unsigned type, result still
+            # unsigned
+    -wd4244 # 'argument' : conversion from 'type1' to 'type2', possible loss of
+            # data
+    -wd4305 # 'context' : truncation from 'type1' to 'type2'
+  )
+elseif(NOT CONFIG_ARCH_TOOLCHAIN_TASKING)
+  add_compile_options(
+    # system wide warnings
+    -Wall $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes> -Wshadow -Wundef
+    # system wide options
+    $<$<COMPILE_LANGUAGE:ASM>:-D__ASSEMBLY__>)
+endif()
+
+if(CONFIG_NDEBUG)
+  add_compile_options(-DNDEBUG)
+endif()
+
+# Cmake build provide absolute paths to compile files. If __FILE__ macros are
+# used in the source code(ASSERT), the binary will contain many invalid paths.
+# This saves some memory, stops exposing build systems locations in binaries,
+# make failure logs more deterministic and most importantly makes builds more
+# failure logs more deterministic and most importantly makes builds more
+# deterministic. Debuggers usually have a path mapping feature to ensure the
+# files are still found.
+if(NOT MSVC)
+  if(CONFIG_OUTPUT_STRIP_PATHS)
+    add_compile_options(-fmacro-prefix-map=${NUTTX_DIR}=)
+    add_compile_options(-fmacro-prefix-map=${NUTTX_APPS_DIR}=)
+    add_compile_options(-fmacro-prefix-map=${NUTTX_BOARD_ABS_DIR}=)
+    add_compile_options(-fmacro-prefix-map=${NUTTX_CHIP_ABS_DIR}=)
+  endif()
+endif()
+
+add_definitions(-D__NuttX__)
+
+add_compile_options($<$<COMPILE_LANGUAGE:ASM>:-D__ASSEMBLY__>)
 
 # Setup main nuttx target ####################################################
 
@@ -498,48 +571,6 @@ else()
   target_compile_options(
     nuttx PRIVATE $<GENEX_EVAL:$<TARGET_PROPERTY:nuttx,NUTTX_COMPILE_OPTIONS>>)
 endif()
-
-if(MSVC)
-  add_compile_options(
-    -W2
-    -wd4116 # unnamed type definition in parentheses
-    -wd4146 # unary minus operator applied to unsigned type, result still
-            # unsigned
-    -wd4244 # 'argument' : conversion from 'type1' to 'type2', possible loss of
-            # data
-    -wd4305 # 'context' : truncation from 'type1' to 'type2'
-  )
-elseif(NOT CONFIG_ARCH_TOOLCHAIN_TASKING)
-  add_compile_options(
-    # system wide warnings
-    -Wall $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes> -Wshadow -Wundef
-    # system wide options
-    $<$<COMPILE_LANGUAGE:ASM>:-D__ASSEMBLY__>)
-endif()
-
-if(CONFIG_NDEBUG)
-  add_compile_options(-DNDEBUG)
-endif()
-
-# Cmake build provide absolute paths to compile files. If __FILE__ macros are
-# used in the source code(ASSERT), the binary will contain many invalid paths.
-# This saves some memory, stops exposing build systems locations in binaries,
-# make failure logs more deterministic and most importantly makes builds more
-# failure logs more deterministic and most importantly makes builds more
-# deterministic. Debuggers usually have a path mapping feature to ensure the
-# files are still found.
-if(NOT MSVC)
-  if(CONFIG_OUTPUT_STRIP_PATHS)
-    add_compile_options(-fmacro-prefix-map=${NUTTX_DIR}=)
-    add_compile_options(-fmacro-prefix-map=${NUTTX_APPS_DIR}=)
-    add_compile_options(-fmacro-prefix-map=${NUTTX_BOARD_ABS_DIR}=)
-    add_compile_options(-fmacro-prefix-map=${NUTTX_CHIP_ABS_DIR}=)
-  endif()
-endif()
-
-add_definitions(-D__NuttX__)
-
-add_compile_options($<$<COMPILE_LANGUAGE:ASM>:-D__ASSEMBLY__>)
 
 set_property(
   TARGET nuttx
@@ -609,7 +640,7 @@ process_all_directory_romfs()
 get_property(ldscript GLOBAL PROPERTY LD_SCRIPT)
 
 # Pre-compile linker script
-if(NOT CONFIG_ARCH_SIM AND NOT CONFIG_ARCH_TOOLCHAIN_TASKING)
+if(NOT CONFIG_ARCH_SIM)
   get_filename_component(LD_SCRIPT_NAME ${ldscript} NAME)
   set(LD_SCRIPT_TMP "${CMAKE_BINARY_DIR}/${LD_SCRIPT_NAME}.tmp")
 

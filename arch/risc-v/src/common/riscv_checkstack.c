@@ -156,7 +156,7 @@ size_t riscv_stack_check(uintptr_t alloc, size_t size)
  *
  ****************************************************************************/
 
-size_t up_check_tcbstack(struct tcb_s *tcb)
+size_t up_check_tcbstack(struct tcb_s *tcb, size_t check_size)
 {
   size_t size;
 
@@ -169,8 +169,7 @@ size_t up_check_tcbstack(struct tcb_s *tcb)
     }
 #endif
 
-  size = riscv_stack_check((uintptr_t)tcb->stack_base_ptr,
-                                      tcb->adj_stack_size);
+  size = riscv_stack_check((uintptr_t)tcb->stack_base_ptr, check_size);
 
 #ifdef CONFIG_ARCH_ADDRENV
   if (tcb->addrenv_own != NULL)
@@ -183,10 +182,14 @@ size_t up_check_tcbstack(struct tcb_s *tcb)
 }
 
 #if CONFIG_ARCH_INTERRUPTSTACK > 15
-size_t up_check_intstack(int cpu)
+size_t up_check_intstack(int cpu, size_t check_size)
 {
-  return riscv_stack_check((uintptr_t)g_intstackalloc,
-                           (CONFIG_ARCH_INTERRUPTSTACK & ~15));
+  if (check_size == 0)
+    {
+      check_size = CONFIG_ARCH_INTERRUPTSTACK & ~15;
+    }
+
+  return riscv_stack_check((uintptr_t)g_intstackalloc, check_size);
 }
 #endif
 

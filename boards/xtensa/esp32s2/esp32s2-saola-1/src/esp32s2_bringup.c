@@ -50,7 +50,7 @@
 #  include "esp32s2_tim_lowerhalf.h"
 #endif
 
-#ifdef CONFIG_ESPRESSIF_WLAN
+#ifdef CONFIG_ESPRESSIF_WIFI
 #  include "esp32s2_board_wlan.h"
 #endif
 
@@ -62,8 +62,8 @@
 #  include "esp32s2_rt_timer.h"
 #endif
 
-#ifdef CONFIG_ESP32S2_EFUSE
-#  include "esp32s2_efuse.h"
+#ifdef CONFIG_ESPRESSIF_EFUSE
+#  include "espressif/esp_efuse.h"
 #endif
 
 #ifdef CONFIG_ESPRESSIF_LEDC
@@ -170,8 +170,8 @@ int esp32s2_bringup(void)
     }
 #endif
 
-#if defined(CONFIG_ESP32S2_EFUSE)
-  ret = esp32s2_efuse_initialize("/dev/efuse");
+#if defined(CONFIG_ESPRESSIF_EFUSE)
+  ret = esp_efuse_initialize("/dev/efuse");
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: Failed to init EFUSE: %d\n", ret);
@@ -341,16 +341,14 @@ int esp32s2_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESPRESSIF_WIRELESS
+#ifdef CONFIG_ESPRESSIF_WIFI
 
-#ifdef CONFIG_ESPRESSIF_WLAN
   ret = board_wlan_init();
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: Failed to initialize wlan subsystem=%d\n",
-             ret);
+              ret);
     }
-#endif
 
 #endif
 

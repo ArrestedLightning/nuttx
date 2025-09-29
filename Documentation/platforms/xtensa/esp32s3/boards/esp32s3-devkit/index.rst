@@ -637,6 +637,16 @@ Enables PM support. You can define standby mode and sleep mode delay time::
            (20) PM_SLEEP delay (seconds)
            (0)  PM_SLEEP delay (nanoseconds)
 
+You can also define an EXT1 wakeup for both sleep modes by selecting which RTC
+GPIO will be used and the logic level that will trigger it::
+
+    $ make menuconfig
+    -> Board Selection
+        -> [*] PM EXT1 Wakeup
+                  PM EXT1 Wakeup Sources  --->
+                    [ ] RTC_GPIO<N>
+              (0) PM EXT1 Wakeup Trigger Mode
+
 Before switching PM status, you need to query the current PM status::
 
     nsh> pmconfig
@@ -819,6 +829,59 @@ Please note that this board contains an on-board WS2812 LED connected to GPIO48
 (or GPIO38, depending on the board version) and, by default, this config
 configures the RMT transmitter in the same pin.
 
+romfs
+-----
+
+This configuration demonstrates the use of ROMFS (Read-Only Memory File System) to provide
+automated system initialization and startup scripts. ROMFS allows embedding a read-only
+filesystem directly into the NuttX binary, which is mounted at ``/etc`` during system startup.
+
+**What ROMFS provides:**
+
+* **System initialization script** (``/etc/init.d/rc.sysinit``): Executed after board bring-up
+* **Startup script** (``/etc/init.d/rcS``): Executed after system init, typically used to start applications
+
+**Default behavior:**
+
+When this configuration is used, NuttX will:
+
+1. Create a read-only RAM disk containing the ROMFS filesystem
+2. Mount the ROMFS at ``/etc``
+3. Execute ``/etc/init.d/rc.sysinit`` during system initialization
+4. Execute ``/etc/init.d/rcS`` for application startup
+
+**Customizing startup scripts:**
+
+The startup scripts are located in:
+``boards/xtensa/esp32s3/common/src/etc/init.d/``
+
+* ``rc.sysinit`` - System initialization script
+* ``rcS`` - Application startup script
+
+To customize these scripts:
+
+1. **Edit the script files** in ``boards/xtensa/esp32s3/common/src/etc/init.d/``
+2. **Add your initialization commands** using any NSH-compatible commands
+
+**Example customizations:**
+
+* **rc.sysinit** - Set up system services, mount additional filesystems, configure network.
+* **rcS** - Start your application, launch daemons, configure peripherals. This is executed after the rc.sysinit script.
+
+Example output::
+
+    *** Booting NuttX ***
+    [...]
+    rc.sysinit is called!
+    rcS file is called!
+    NuttShell (NSH) NuttX-12.8.0
+    nsh> ls /etc/init.d
+    /etc/init.d:
+    .
+    ..
+    rc.sysinit
+    rcS
+
 rtc
 ---
 
@@ -962,6 +1025,26 @@ Once booted you can use the following commands to mount the file system::
     nsh> mount -t smartfs /dev/smart0 /mnt
 
 Note that mksmartfs is only needed the first time.
+
+spislv
+------
+
+This configuration enables the SPI2 peripheral in **slave mode** and
+provides the ``spislv`` example application to test data exchange with an
+external SPI master.
+
+After building and flashing the firmware, run the following command on the
+board terminal::
+
+    nsh> spislv -x 5 1a2b3c4d5e
+
+This command enqueues the data sequence ``1a2b3c4d5e`` in the slave buffer.
+On the next transfer, the external SPI master should receive this data back
+from the slave.
+
+By default, SPI2 pins are used for the slave interface. The exact pin mapping
+depends on the ESP32-S3 DevKit version and can be adjusted through
+``menuconfig`` under *System type → SPI configuration*.
 
 sta_softap
 ----------

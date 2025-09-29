@@ -129,12 +129,16 @@
 #  include "espressif/esp_sha.h"
 #endif
 
-#ifdef CONFIG_NCV7410
-#  include "esp_board_ncv7410.h"
+#ifdef CONFIG_NET_OA_TC6
+#  include "esp_board_oa_tc6.h"
 #endif
 
 #ifdef CONFIG_MMCSD_SPI
 #  include "esp_board_mmcsd.h"
+#endif
+
+#ifdef CONFIG_ESPRESSIF_USE_LP_CORE
+#  include "espressif/esp_ulp.h"
 #endif
 
 #include "esp32c6-devkitc.h"
@@ -503,11 +507,20 @@ int esp_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_NCV7410
-  ret = board_ncv7410_initialize();
+#ifdef CONFIG_ESPRESSIF_USE_LP_CORE
+
+  /* ULP initialization should be the handled later than
+   * peripherals to use supported peripherals properly on ULP core
+   */
+
+  esp_ulp_init();
+#endif
+
+#ifdef CONFIG_NET_OA_TC6
+  ret = board_oa_tc6_initialize();
   if (ret < 0)
     {
-      syslog(LOG_ERR, "ERROR: esp_ncv7410_initialize failed: %d\n", ret);
+      syslog(LOG_ERR, "ERROR: esp_oa_tc6_initialize failed: %d\n", ret);
     }
 #endif
 
