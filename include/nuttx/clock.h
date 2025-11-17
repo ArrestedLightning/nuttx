@@ -324,18 +324,6 @@ extern "C"
 #define EXTERN extern
 #endif
 
-/* Access to raw system clock ***********************************************/
-
-/* Direct access to the system timer/counter is supported only if (1) the
- * system timer counter is available (i.e., we are not configured to use
- * a hardware periodic timer), and (2) the execution environment has direct
- * access to kernel global data
- */
-
-#ifdef __HAVE_KERNEL_GLOBALS
-EXTERN volatile clock_t g_system_ticks;
-#endif
-
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
@@ -731,13 +719,13 @@ clock_t clock_systime_ticks(void);
  *   ts - Location to return the time
  *
  * Returned Value:
- *   OK (0) on success; a negated errno value on failure.
+ *   None
  *
  * Assumptions:
  *
  ****************************************************************************/
 
-int clock_systime_timespec(FAR struct timespec *ts);
+void clock_systime_timespec(FAR struct timespec *ts);
 
 /****************************************************************************
  * Name:  clock_cpuload

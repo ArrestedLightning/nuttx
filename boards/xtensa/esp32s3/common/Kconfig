@@ -33,7 +33,7 @@ config ESP32S3_SPEED_UP_ISR
 config ESP32S3_STORAGE_MTD_OFFSET
 	hex "Storage MTD base address in SPI Flash"
 	default 0x180000 if !ESP32S3_HAVE_OTA_PARTITION
-	default 0x250000 if ESP32S3_HAVE_OTA_PARTITION
+	default 0x260000 if ESP32S3_HAVE_OTA_PARTITION
 	depends on ESP32S3_MTD
 	---help---
 		MTD base address in SPI Flash.
@@ -232,6 +232,15 @@ config PM_EXT1_WAKEUP_TRIGGER_MODE
 
 endif # PM_EXT1_WAKEUP
 
+config PM_ULP_WAKEUP
+	bool "PM ULP Wakeup"
+	default n
+	---help---
+		Enable ULP RISC-V coprocessor wakeup functionality.
+		This allows the system to wake up from PM_STANDBY or PM_SLEEP
+		when ULP app triggers HP core to wakeup with "ulp_riscv_wakeup_main_processor"
+		call on ULP app.
+
 config PM_ALARM_SEC
 	int "PM_STANDBY delay (seconds)"
 	default 15
@@ -262,3 +271,10 @@ config ESP32S3_BOARD_I2C
 	bool
 	default y if ESP32S3_I2C0 || ESP32S3_I2C1
 
+config ESPRESSIF_ULP_USE_TEST_BIN
+	bool "Run example prebuilt binary for ULP core"
+	depends on ESPRESSIF_USE_ULP_RISCV_CORE
+	default n
+	---help---
+		Run example prebuilt binary for ULP core which is resides in
+		`Documentation/platforms/xtensa/esp32s3/boards/esp32s3-devkit/ulp_riscv_blink.bin`

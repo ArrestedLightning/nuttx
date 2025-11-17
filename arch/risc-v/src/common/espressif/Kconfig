@@ -235,14 +235,6 @@ config ESPRESSIF_USE_LP_CORE
 	---help---
 		Enable LP core (Low-power core) coprocessor
 
-config ESPRESSIF_ULP_PROJECT_PATH
-	string "Path to ULP project (relative to nuttx root folder)"
-	depends on ESPRESSIF_USE_LP_CORE
-	default ""
-	---help---
-		Path to ULP project to include build system and run on LP core.
-		This path can either be a .bin file or a project folder
-
 config ESPRESSIF_ULP_COPROC_RESERVE_MEM_SIZE
 	int "RTC slow memory reserved for coprocessor"
 	depends on ESPRESSIF_USE_LP_CORE
@@ -455,6 +447,10 @@ config ESPRESSIF_SPI
 	bool
 	default n
 
+config ESPRESSIF_SPI_SLAVE
+	bool
+	default n
+
 config ESPRESSIF_SPI_PERIPH
 	bool
 	depends on ESPRESSIF_SPI2
@@ -477,8 +473,11 @@ config ESPRESSIF_SPI_BITBANG
 		Software implemented SPI peripheral with GPIOs. Suggested to use if SPI peripheral is already in use.
 
 config ESPRESSIF_SPIFLASH
-	bool "SPI Flash"
+	bool "SPI Flash (User Storage)"
 	default n
+	---help---
+		Enable SPI Flash driver for general storage support. This allows
+		mounting an MTD partition at a configurable region in flash.
 
 config ESPRESSIF_DMA
 	bool "General DMA (GDMA)"
@@ -1652,13 +1651,25 @@ config ESPRESSIF_SPI2_DMATHRESHOLD
 		When SPI GDMA is enabled, GDMA transfers whose size are below the
 		defined threshold will be performed by polling logic.
 
+choice ESPRESSIF_SPI2_MODE
+	prompt "SPI2 mode"
+	default ESPRESSIF_SPI2_MODE_MASTER
+
+config ESPRESSIF_SPI2_MODE_MASTER
+	bool "SPI2 Master mode"
+	depends on SPI_DRIVER
+	---help---
+		Configure SPI2 to operate in Master mode.
+
 config ESPRESSIF_SPI2_SLAVE
 	bool "SPI2 Slave mode"
-	default n
 	depends on SPI_SLAVE
 	select ESPRESSIF_GPIO_IRQ
+	select ESPRESSIF_SPI_SLAVE
 	---help---
 		Configure SPI2 to operate in Slave mode.
+
+endchoice # ESPRESSIF_SPI2_MODE
 
 config ESPRESSIF_SPI2_SLAVE_BUFSIZE
 	int "SPI2 Slave buffer size"
@@ -1672,49 +1683,80 @@ config ESPRESSIF_SPI2_CSPIN
 	default 10 if ARCH_CHIP_ESP32C3_GENERIC
 	default 16 if ARCH_CHIP_ESP32C6
 	default 1 if ARCH_CHIP_ESP32H2
-	range 0 21
+	range 0 21 if ARCH_CHIP_ESP32C3_GENERIC
+	range 0 30 if ARCH_CHIP_ESP32C6
+	range 0 27 if ARCH_CHIP_ESP32H2
 
 config ESPRESSIF_SPI2_CLKPIN
 	int "SPI2 CLK Pin"
-	default 6 if !ARCH_CHIP_ESP32H2
+	default 6 if ARCH_CHIP_ESP32C3_GENERIC
+	default 6 if ARCH_CHIP_ESP32C6
 	default 4 if ARCH_CHIP_ESP32H2
-	range 0 21
+	range 0 21 if ARCH_CHIP_ESP32C3_GENERIC
+	range 0 30 if ARCH_CHIP_ESP32C6
+	range 0 27 if ARCH_CHIP_ESP32H2
 
 config ESPRESSIF_SPI2_MOSIPIN
 	int "SPI2 MOSI Pin"
-	default 7 if !ARCH_CHIP_ESP32H2
+	default 7 if ARCH_CHIP_ESP32C3_GENERIC
+	default 7 if ARCH_CHIP_ESP32C6
 	default 5 if ARCH_CHIP_ESP32H2
-	range 0 21
+	range 0 21 if ARCH_CHIP_ESP32C3_GENERIC
+	range 0 30 if ARCH_CHIP_ESP32C6
+	range 0 27 if ARCH_CHIP_ESP32H2
 
 config ESPRESSIF_SPI2_MISOPIN
 	int "SPI2 MISO Pin"
-	default 2 if !ARCH_CHIP_ESP32H2
+	default 2 if ARCH_CHIP_ESP32C3_GENERIC
+	default 2 if ARCH_CHIP_ESP32C6
 	default 0 if ARCH_CHIP_ESP32H2
-	range 0 21
+	range 0 21 if ARCH_CHIP_ESP32C3_GENERIC
+	range 0 30 if ARCH_CHIP_ESP32C6
+	range 0 27 if ARCH_CHIP_ESP32H2
 
 endif # ESPRESSIF_SPI2
 
 if ESPRESSIF_SPI_BITBANG
 
+choice ESPRESSIF_SPI_BITBANG_OPERATION_MODE
+	prompt "SPI Bitbang mode"
+	default ESPRESSIF_SPI_BITBANG_OPERATION_MODE_MASTER
+
+config ESPRESSIF_SPI_BITBANG_OPERATION_MODE_MASTER
+	bool "SPI Bitbang Master mode"
+	depends on SPI_DRIVER
+	---help---
+		Configure SPI Bitbang to operate in Master mode.
+
+endchoice # ESPRESSIF_SPI_BITBANG_OPERATION_MODE
+
 config ESPRESSIF_SPI_BITBANG_CSPIN
 	int "SPI Bitbang CS Pin"
 	default 0
-	range 0 21
+	range 0 21 if ARCH_CHIP_ESP32C3_GENERIC
+	range 0 30 if ARCH_CHIP_ESP32C6
+	range 0 27 if ARCH_CHIP_ESP32H2
 
 config ESPRESSIF_SPI_BITBANG_CLKPIN
 	int "SPI Bitbang CLK Pin"
 	default 1
-	range 0 21
+	range 0 21 if ARCH_CHIP_ESP32C3_GENERIC
+	range 0 30 if ARCH_CHIP_ESP32C6
+	range 0 27 if ARCH_CHIP_ESP32H2
 
 config ESPRESSIF_SPI_BITBANG_MOSIPIN
 	int "SPI Bitbang MOSI Pin"
 	default 2
-	range 0 21
+	range 0 21 if ARCH_CHIP_ESP32C3_GENERIC
+	range 0 30 if ARCH_CHIP_ESP32C6
+	range 0 27 if ARCH_CHIP_ESP32H2
 
 config ESPRESSIF_SPI_BITBANG_MISOPIN
 	int "SPI Bitbang MISO Pin"
 	default 3
-	range 0 21
+	range 0 21 if ARCH_CHIP_ESP32C3_GENERIC
+	range 0 30 if ARCH_CHIP_ESP32C6
+	range 0 27 if ARCH_CHIP_ESP32H2
 
 choice ESPRESSIF_SPI_BITBANG_MODE
 	prompt "SPI Bitbang mode"
@@ -1784,35 +1826,6 @@ config ESPRESSIF_FLASH_MODE_QOUT
 
 endchoice # ESPRESSIF_FLASH_MODE
 
-if ESPRESSIF_SPIFLASH
-comment "General storage MTD configuration"
-
-config ESPRESSIF_MTD
-	bool "MTD driver"
-	default y
-	select MTD
-	select MTD_BYTE_WRITE
-	select MTD_PARTITION
-	---help---
-		Initialize an MTD driver for the SPI Flash, which will
-		add an entry at /dev for application access from userspace.
-
-config ESPRESSIF_SPIFLASH_MTD_BLKSIZE
-	int "Storage MTD block size"
-	default 64
-	depends on ESPRESSIF_MTD
-	---help---
-		Block size for MTD driver in kB. This size must be divisible by 2
-
-config ESPRESSIF_STORAGE_MTD_DEBUG
-	bool "Storage MTD Debug"
-	default n
-	depends on ESPRESSIF_MTD && DEBUG_FS_INFO
-	---help---
-		If this option is enabled, Storage MTD driver read and write functions
-		will output input parameters and return values (if applicable).
-endif # ESPRESSIF_SPIFLASH
-
 choice ESPRESSIF_FLASH_FREQ
 	prompt "SPI Flash frequency"
 	default ESPRESSIF_FLASH_FREQ_80M if ARCH_CHIP_ESP32C3_GENERIC || ARCH_CHIP_ESP32C6
@@ -1877,6 +1890,36 @@ config ESPRESSIF_SPI_FLASH_USE_32BIT_ADDRESS
 		of functions in ROM, so that SPI flash driver can access full
 		32-bit address.
 
+endmenu # SPI Flash Configuration
+
+if ESPRESSIF_SPIFLASH
+menu "User Storage MTD Configuration"
+
+config ESPRESSIF_MTD
+	bool "MTD driver"
+	default y
+	select MTD
+	select MTD_BYTE_WRITE
+	select MTD_PARTITION
+	---help---
+		Initialize an MTD driver for the SPI Flash, which will
+		add an entry at /dev for application access from userspace.
+
+config ESPRESSIF_SPIFLASH_MTD_BLKSIZE
+	int "Storage MTD block size"
+	default 64
+	depends on ESPRESSIF_MTD
+	---help---
+		Block size for MTD driver in kB. This size must be divisible by 2
+
+config ESPRESSIF_STORAGE_MTD_DEBUG
+	bool "Storage MTD Debug"
+	default n
+	depends on ESPRESSIF_MTD && DEBUG_FS_INFO
+	---help---
+		If this option is enabled, Storage MTD driver read and write functions
+		will output input parameters and return values (if applicable).
+
 config ESPRESSIF_STORAGE_MTD_OFFSET
 	hex "Storage MTD base address in SPI Flash"
 	default 0x180000 if !ESPRESSIF_BOOTLOADER_MCUBOOT
@@ -1892,7 +1935,8 @@ config ESPRESSIF_STORAGE_MTD_SIZE
 	---help---
 		MTD size in SPI Flash.
 
-endmenu # SPI Flash Configuration
+endmenu # User Storage MTD Configuration
+endif # ESPRESSIF_SPIFLASH
 
 menu "RTC Configuration"
 	depends on ESPRESSIF_RTC

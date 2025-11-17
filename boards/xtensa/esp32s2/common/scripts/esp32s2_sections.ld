@@ -156,9 +156,13 @@ SECTIONS
     . = ALIGN (4);
     esp32s2_start.*(.literal .text .literal.* .text.*)
     esp32s2_region.*(.text .text.* .literal .literal.*)
-
+    *libpp.a:wifi_iram.*(.literal .text .literal.* .text.*)
+    *libpp.a:wifi_rx_iram.*(.literal .text .literal.* .text.*)
+    *libpp.a:wifi_extra_iram.*(.literal .text .literal.* .text.*)
+    *libpp.a:wifi_slp_iram.*(.literal .text .literal.* .text.*)
+    *libpp.a:wifi_or_slp_iram.*(.literal .text .literal.* .text.*)
+    *libpp.a:wifi_slp_rx_iram.*(.literal .text .literal.* .text.*)
     *libarch.a:*esp_loader.*(.literal .text .literal.* .text.*)
-    *libarch.a:esp32s2_spiflash.*(.literal .text .literal.* .text.*)
     *libarch.a:*brownout_hal.*(.text .text.* .literal .literal.*)
     *libarch.a:*cpu.*(.text .text.* .literal .literal.*)
     *libarch.a:*gpio_hal.*(.text .text.* .literal .literal.*)
@@ -212,10 +216,6 @@ SECTIONS
     *libarch.a:*esp_rom_spiflash.*(.text .text.* .literal .literal.*)
     *libarch.a:*esp_rom_cache_esp32s2_esp32s3.*(.text .text.* .literal .literal.*)
     *libarch.a:*esp_rom_wdt.*(.text .text.* .literal .literal.*)
-    *libarch.a:*esp_efuse_fields.*(.text .text.* .literal .literal.*)
-    *libarch.a:*esp_efuse_utility.*(.text .text.* .literal .literal.*)
-    *libarch.a:*esp_efuse_startup.*(.text .text.* .literal .literal.*)
-    *libarch.a:*esp_efuse_api_key.*(.text .text.* .literal .literal.*)
     *libarch.a:*log.*(.text .text.* .literal .literal.*)
     *libarch.a:*log_lock.*(.literal .literal.* .text .text.*)
     *libarch.a:*log_print.*(.literal .literal.* .text .text.*)
@@ -226,7 +226,20 @@ SECTIONS
     *libarch.a:*log_write.*(.literal.esp_log_writev .text.esp_log_writev)
     *libarch.a:*cpu_region_protect.*(.text .text.* .literal .literal.*)
     *libarch.a:*flash_qio_mode.*(.text .text.* .literal .literal.*)
-    *libarch.a:*spi_flash_wrap.*(.text .text.* .literal .literal.*)
+    *libarch.a:esp_spiflash.*(.literal .text .literal.* .text.*)
+    *libarch.a:esp_flash_api.*(.text .text.* .literal .literal.*)
+    *libarch.a:esp_flash_spi_init.*(.text .text.* .literal .literal.*)
+    *libarch.a:spi_flash_hal_iram.*(.literal .literal.* .text .text.*)
+    *libarch.a:spi_flash_encrypt_hal_iram.*(.text .text.* .literal .literal.*)
+    *libarch.a:spi_flash_hal_gpspi.*(.literal .literal.* .text .text.*)
+    *libarch.a:spi_flash_chip*.*(.literal .literal.* .text .text.*)
+    *libarch.a:spi_flash_wrap.*(.literal .literal.* .text .text.*)
+    *libarch.a:spi_flash_os_func_noos.*(.literal .literal.* .text .text.*)
+    *libarch.a:spi_flash_os_func_app.*(.literal .literal.* .text .text.*)
+    *libarch.a:flash_brownout_hook.*(.literal .literal.* .text .text.*)
+    *libarch.a:esp_cache.*(.literal .literal.* .text .text.*)
+    *libarch.a:cache_utils.*(.literal .literal.* .text .text.*)
+    *libarch.a:memspi_host_driver.*(.literal .literal.* .text .text.*)
 
     *libc.a:sq_remlast.*(.literal .text .literal.* .text.*)
 
@@ -327,7 +340,6 @@ SECTIONS
     esp32s2_region.*(.rodata .rodata.*)
 
     *libarch.a:*esp_loader.*(.rodata .rodata.*)
-    *libarch.a:esp32s2_spiflash.*(.rodata .rodata.*)
     *libarch.a:*brownout.*(.rodata .rodata.*)
     *libarch.a:*cpu.*(.rodata .rodata.*)
     *libarch.a:*gpio_hal.*(.rodata .rodata.*)
@@ -375,16 +387,24 @@ SECTIONS
     *libarch.a:*esp_rom_spiflash.*(.rodata .rodata.*)
     *libarch.a:*esp_rom_cache_esp32s2_esp32s3.*(.rodata .rodata.*)
     *libarch.a:*esp_rom_wdt.*(.rodata .rodata.*)
-    *libarch.a:*esp_efuse_fields.*(.rodata .rodata.*)
-    *libarch.a:*esp_efuse_api_key.*(.rodata .rodata.*)
-    *libarch.a:*esp_efuse_utility.*(.rodata .rodata.*)
-    *libarch.a:*esp_efuse_startup.*(.rodata .rodata.*)
     *libarch.a:*efuse_hal.*(.rodata .rodata.*)
     *libarch.a:*log.*(.rodata .rodata.*)
     *libarch.a:*log_noos.*(.rodata .rodata.*)
     *libarch.a:*cpu_region_protect.*(.rodata .rodata.*)
     *libarch.a:*flash_qio_mode.*(.rodata .rodata.*)
-    *libarch.a:*spi_flash_wrap.*(.rodata .rodata.*)
+    *libarch.a:esp_flash_api.*(.rodata .rodata.*)
+    *libarch.a:esp_flash_spi_init.*(.rodata .rodata.*)
+    *libarch.a:spi_flash_hal_iram.*(.rodata .rodata.*)
+    *libarch.a:spi_flash_encrypt_hal_iram.*(.rodata .rodata.*)
+    *libarch.a:spi_flash_hal_gpspi.*(.rodata .rodata.*)
+    *libarch.a:spi_flash_chip*.*(.rodata .rodata.*)
+    *libarch.a:spi_flash_wrap.*(.rodata .rodata.*)
+    *libarch.a:spi_flash_os_func_noos.*(.rodata .rodata.*)
+    *libarch.a:spi_flash_os_func_app.*(.rodata .rodata.*)
+    *libarch.a:flash_brownout_hook.*(.rodata .rodata.*)
+    *libarch.a:esp_cache.*(.rodata .rodata.*)
+    *libarch.a:cache_utils.*(.rodata .rodata.*)
+    *libarch.a:memspi_host_driver.*(.rodata .rodata.*)
 
     *libsched.a:irq_dispatch.*(.rodata .rodata.*)
     *libsched.a:sched_lock.*(.rodata .rodata.*)
@@ -452,12 +472,10 @@ SECTIONS
     _srodata = ABSOLUTE(.);
     *(EXCLUDE_FILE (esp32s2_start.* esp32s2_region.*
                     *libarch.a:*esp_loader.*
-                    *libarch.a:esp32s2_spiflash.*
                     *libarch.a:*cache_hal.* *libarch.a:*mmu_hal.*
                     *libarch.a:*mpu_hal.*) .rodata)
     *(EXCLUDE_FILE (esp32s2_start.* esp32s2_region.*
                     *libarch.a:*esp_loader.*
-                    *libarch.a:esp32s2_spiflash.*
                     *libarch.a:*cache_hal.* *libarch.a:*mmu_hal.*
                     *libarch.a:*mpu_hal.*) .rodata.*)
 
