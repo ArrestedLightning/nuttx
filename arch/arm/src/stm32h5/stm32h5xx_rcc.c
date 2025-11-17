@@ -696,7 +696,6 @@ static inline void rcc_enableccip(void)
  * Description:
  *   Set proper flash latency based on VOS Range and SYSCLK_FREQUENCY.
  *   See table 44 in RM0481.
- *   TODO - Set prefetch enable based on board.h variable.
  *
  ****************************************************************************/
 
@@ -807,6 +806,15 @@ static inline void rcc_set_flash_latency(void)
           regval = FLASH_ACR_LATENCY(5) | FLASH_ACR_WRHIGHFREQ(2);
         }
     }
+
+#ifdef CONFIG_STM32H5_FLASH_PREFETCH
+  /* Enable prefetch if 1 or more wait states are required */
+
+  if ((regval & FLASH_ACR_LATENCY_MASK) != 0)
+    {
+      regval |= FLASH_ACR_PRFTEN;
+    }
+#endif
 
   putreg32(regval, STM32_FLASH_ACR);
 }
