@@ -1053,9 +1053,10 @@ config STM32H5_ADC1_DMA_BATCH
 		each group conversion.
 
 config STM32H5_ADC1_DMA_CFG
-	bool "ADC1 DMA configuration"
+	int "ADC1 DMA configuration"
 	depends on STM32H5_ADC1 && STM32H5_ADC1_DMA
-	default n
+	default 0
+	range 0 1
 	---help---
 		0 - ADC1 DMA in One Shot Mode, 1 - ADC1 DMA in Circular Mode
 
