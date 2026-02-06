@@ -3327,7 +3327,7 @@ static int stm32_phyinit(struct stm32_ethmac_s *priv)
   to = PHY_RESET_DELAY;
   do
     {
-      up_mdelay(10);
+      nxsched_usleep(USEC_PER_MSEC * 10);
       to -= 10;
       ret = stm32_phyread(CONFIG_STM32H5_PHYADDR, MII_MCR, &phyval);
     }
@@ -3502,7 +3502,7 @@ static int stm32_phyinit(struct stm32_ethmac_s *priv)
       return ret;
     }
 
-  up_mdelay(PHY_CONFIG_DELAY);
+  nxsched_usleep(USEC_PER_MSEC * (PHY_CONFIG_DELAY);
 
   /* Remember the selected speed and duplex modes */
 
