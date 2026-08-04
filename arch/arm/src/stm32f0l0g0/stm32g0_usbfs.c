@@ -46,6 +46,7 @@
 
 #include "arm_internal.h"
 #include "hardware/stm32_rcc.h"
+#include "hardware/stm32g0_usbfs.h"
 #include "stm32.h"
 #include "stm32_gpio.h"
 #include "stm32_usbdev.h"
@@ -95,6 +96,7 @@
 #define EP6                   (6)
 #define EP7                   (7)
 
+#define STM32_NENDPOINTS      (8)
 #define STM32_ENDP_BIT(ep)    (1 << (ep))
 #define STM32_ENDP_ALLSET     0xff
 
