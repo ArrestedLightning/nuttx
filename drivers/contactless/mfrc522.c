@@ -37,7 +37,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/kmalloc.h>
 #include <nuttx/signal.h>
@@ -1220,6 +1220,14 @@ int mfrc522_mifare_read(FAR struct mfrc522_dev_s *dev,
   uint8_t length    = 18;
   uint8_t validbits = 0;
   int     ret       = OK;
+
+  /* Validate expected tag size (only pages 0x0, ..., 0xf are valid. */
+
+  if (data->address > 15)
+    {
+      ret = -ERANGE;
+      goto errout;
+    }
 
   /* Read block from address */
 

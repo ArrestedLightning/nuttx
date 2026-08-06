@@ -33,19 +33,20 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <errno.h>
 #include <nuttx/fs/fs.h>
 #include <arch/board/board.h>
 
-#include "esp32s3_gpio.h"
+#include "espressif/esp_gpio.h"
+#include "esp32s3_start.h"
 
 #ifdef CONFIG_ESP32S3_TIMER
 #  include "esp32s3_board_tim.h"
 #endif
 
-#ifdef CONFIG_ESPRESSIF_WLAN
+#ifdef CONFIG_ESPRESSIF_WIFI
 #  include "esp32s3_board_wlan.h"
 #endif
 
@@ -55,10 +56,6 @@
 
 #ifdef CONFIG_ESPRESSIF_WIFI_BT_COEXIST
 #  include "esp32s3_wifi_adapter.h"
-#endif
-
-#ifdef CONFIG_ESP32S3_RT_TIMER
-#  include "esp32s3_rt_timer.h"
 #endif
 
 #ifdef CONFIG_ESP32S3_I2C
@@ -78,7 +75,11 @@
 #endif
 
 #ifdef CONFIG_RTC_DRIVER
-#  include "esp32s3_rtc_lowerhalf.h"
+#  include "espressif/esp_rtc.h"
+#endif
+
+#ifdef CONFIG_ESPRESSIF_HR_TIMER
+#  include "espressif/esp_hr_timer.h"
 #endif
 
 #ifdef CONFIG_ESPRESSIF_EFUSE
@@ -110,8 +111,8 @@
 #include "esp32s3_board_sdmmc.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_AES_ACCELERATOR
-#  include "esp32s3_aes.h"
+#ifdef CONFIG_ESPRESSIF_AES_ACCELERATOR
+#  include "espressif/esp_aes.h"
 #endif
 
 #ifdef CONFIG_ESP32S3_ADC
@@ -133,14 +134,20 @@
  *   CONFIG_BOARD_LATE_INITIALIZE=y :
  *     Called from board_late_initialize().
  *
- *   CONFIG_BOARD_LATE_INITIALIZE=n && CONFIG_BOARDCTL=y :
- *     Called from the NSH library
- *
  ****************************************************************************/
 
 int esp32s3_bringup(void)
 {
   int ret = OK;
+
+#ifdef CONFIG_ESPRESSIF_HR_TIMER
+  ret = esp_hr_timer_init();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: esp_hr_timer_init() failed: %d\n", ret);
+    }
+#endif
+
 #if (defined(CONFIG_ESPRESSIF_I2S0) && !defined(CONFIG_AUDIO_CS4344) && \
      !defined(CONFIG_AUDIO_ES8311)) || defined(CONFIG_ESPRESSIF_I2S1)
   bool i2s_enable_tx;
@@ -241,22 +248,14 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_RT_TIMER
-  ret = esp32s3_rt_timer_init();
-  if (ret < 0)
-    {
-      syslog(LOG_ERR, "Failed to initialize RT timer: %d\n", ret);
-    }
-#endif
-
 #ifdef CONFIG_ESP_RMT
-  ret = board_rmt_txinitialize(RMT_TXCHANNEL, RMT_OUTPUT_PIN);
+  ret = board_rmt_txinitialize(RMT_OUTPUT_PIN);
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: board_rmt_txinitialize() failed: %d\n", ret);
     }
 
-  ret = board_rmt_rxinitialize(RMT_RXCHANNEL, RMT_INPUT_PIN);
+  ret = board_rmt_rxinitialize(RMT_INPUT_PIN);
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: board_rmt_txinitialize() failed: %d\n", ret);
@@ -266,7 +265,7 @@ int esp32s3_bringup(void)
 #ifdef CONFIG_RTC_DRIVER
   /* Instantiate the ESP32-S3 RTC driver */
 
-  ret = esp32s3_rtc_driverinit();
+  ret = esp_rtc_driverinit();
   if (ret < 0)
     {
       syslog(LOG_ERR,
@@ -311,8 +310,8 @@ int esp32s3_bringup(void)
 
   /* Configure ES8311 audio on I2C0 and I2S0 */
 
-  esp32s3_configgpio(SPEAKER_ENABLE_GPIO, OUTPUT);
-  esp32s3_gpiowrite(SPEAKER_ENABLE_GPIO, true);
+  esp_configgpio(SPEAKER_ENABLE_GPIO, OUTPUT);
+  esp_gpiowrite(SPEAKER_ENABLE_GPIO, true);
 
   i2c = esp32s3_i2cbus_initialize(ESP32S3_I2C0);
   if (i2c == NULL)
@@ -412,7 +411,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESPRESSIF_WLAN
+#ifdef CONFIG_ESPRESSIF_WIFI
   ret = board_wlan_init();
   if (ret < 0)
     {
@@ -439,8 +438,8 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_AES_ACCELERATOR
-  ret = esp32s3_aes_init();
+#ifdef CONFIG_ESPRESSIF_AES_ACCELERATOR
+  ret = esp_aes_init();
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: Failed to initialize AES: %d\n", ret);
@@ -448,7 +447,7 @@ int esp32s3_bringup(void)
 #ifdef CONFIG_ESP32S3_AES_ACCELERATOR_TEST
   else
     {
-      esp32s3_aes_test();
+      esp_aes_test();
     }
 #endif
 #endif

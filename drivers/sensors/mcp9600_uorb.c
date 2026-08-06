@@ -30,7 +30,7 @@
 #include <nuttx/nuttx.h>
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <stdio.h>
 
@@ -46,6 +46,12 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+/* Only float data type supported now */
+
+#ifdef CONFIG_SENSORS_USE_B16
+#  error fixed-point data type not supported yet
+#endif
 
 #define REG_THERMO_HOT_JUNC 0x0 /* Thermocouple Hot-Junction, T H */
 #define REG_JUNC_TEMP_DELTA 0x1 /* Junctions Temperature Delta, TΔ */

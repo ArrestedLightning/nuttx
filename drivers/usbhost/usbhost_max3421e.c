@@ -42,7 +42,7 @@
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/arch.h>
 #include <nuttx/kmalloc.h>
@@ -1640,7 +1640,7 @@ static void max3421e_send_continue(FAR struct max3421e_usbhost_s *priv)
     }
 
   /* If the number inflight is exactly the maxpacket size and the transfer
-   * is not yet finished, then the the transfer size must have been max
+   * is not yet finished, then the transfer size must have been max
    * packet size.
    */
 

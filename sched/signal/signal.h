@@ -116,6 +116,14 @@ typedef struct sigq_s sigq_t;
  * Public Data
  ****************************************************************************/
 
+/* The g_sigactions data structure a pool of pre-allocated signal action
+ * structures buffers structures.
+ */
+
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
+extern  sigactq_t  g_sigactions[CONFIG_SIG_PREALLOC_ACTIONS];
+#endif
+
 /* The g_sigfreeaction data structure is a list of available signal action
  * structures.
  */
@@ -203,6 +211,13 @@ void               nxsig_release_pendingsigaction(FAR sigq_t *sigq);
 void               nxsig_release_pendingsignal(FAR sigpendq_t *sigpend);
 FAR sigpendq_t    *nxsig_remove_pendingsignal(FAR struct tcb_s *stcb,
                                               int signo);
+#ifndef CONFIG_DISABLE_ALL_SIGNALS
 bool               nxsig_unmask_pendingsignal(void);
+#else
+static inline bool nxsig_unmask_pendingsignal(void)
+{
+  return false;
+}
+#endif
 
 #endif /* __SCHED_SIGNAL_SIGNAL_H */

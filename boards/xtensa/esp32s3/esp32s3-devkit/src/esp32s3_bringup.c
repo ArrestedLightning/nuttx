@@ -32,13 +32,16 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <stdio.h>
 
 #include <errno.h>
 #include <nuttx/fs/fs.h>
 #include <nuttx/himem/himem.h>
 #include <arch/board/board.h>
+
+#include "espressif/esp_gpio.h"
+#include "esp32s3_start.h"
 
 #ifdef CONFIG_ESP32S3_TIMER
 #  include "esp32s3_board_tim.h"
@@ -56,16 +59,8 @@
 #  include "esp32s3_wifi_adapter.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_RT_TIMER
-#  include "esp32s3_rt_timer.h"
-#endif
-
 #ifdef CONFIG_ESP32S3_I2C
 #  include "esp32s3_i2c.h"
-#endif
-
-#ifdef CONFIG_ESPRESSIF_I2S
-#  include "espressif/esp_i2s.h"
 #endif
 
 #ifdef CONFIG_ESPRESSIF_I2S
@@ -81,7 +76,11 @@
 #endif
 
 #ifdef CONFIG_RTC_DRIVER
-#  include "esp32s3_rtc_lowerhalf.h"
+#  include "espressif/esp_rtc.h"
+#endif
+
+#ifdef CONFIG_ESPRESSIF_HR_TIMER
+#  include "espressif/esp_hr_timer.h"
 #endif
 
 #ifdef CONFIG_VIDEO_FB
@@ -124,8 +123,8 @@
 #include "esp32s3_board_sdmmc.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_AES_ACCELERATOR
-#  include "esp32s3_aes.h"
+#ifdef CONFIG_ESPRESSIF_AES_ACCELERATOR
+#  include "espressif/esp_aes.h"
 #endif
 
 #ifdef CONFIG_ESPRESSIF_ADC
@@ -153,6 +152,10 @@
 #  include "espressif/esp_sha.h"
 #endif
 
+#ifdef CONFIG_ESPRESSIF_AES_ACCELERATOR
+#  include "espressif/esp_aes.h"
+#endif
+
 #ifdef CONFIG_ESPRESSIF_USE_ULP_RISCV_CORE
 #  include "espressif/esp_ulp.h"
 #  ifdef CONFIG_ESPRESSIF_ULP_USE_TEST_BIN
@@ -175,9 +178,6 @@
  *   CONFIG_BOARD_LATE_INITIALIZE=y :
  *     Called from board_late_initialize().
  *
- *   CONFIG_BOARD_LATE_INITIALIZE=n && CONFIG_BOARDCTL=y :
- *     Called from the NSH library
- *
  ****************************************************************************/
 
 int esp32s3_bringup(void)
@@ -198,6 +198,14 @@ int esp32s3_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_ESPRESSIF_HR_TIMER
+  ret = esp_hr_timer_init();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: esp_hr_timer_init() failed: %d\n", ret);
+    }
+#endif
+
 #if defined(CONFIG_ESP32S3_SPI) && defined(CONFIG_SPI_DRIVER)
 
   #if defined(CONFIG_SPI_SLAVE_DRIVER) && defined(CONFIG_ESP32S3_SPI2)
@@ -214,7 +222,7 @@ int esp32s3_bringup(void)
   if (ret < 0)
     {
       syslog(LOG_ERR, "Failed to initialize SPI%d Slave driver: %d\n",
-             ESP32S3_SPI2, ret);
+             ESP32S3_SPI3, ret);
     }
   #endif
 
@@ -251,14 +259,23 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#if defined(CONFIG_ESPRESSIF_SHA_ACCELERATOR) && \
-    !defined(CONFIG_CRYPTO_CRYPTODEV_HARDWARE)
+#if !defined(CONFIG_CRYPTO_CRYPTODEV_HARDWARE)
+#  if defined(CONFIG_ESPRESSIF_SHA_ACCELERATOR)
   ret = esp_sha_init();
   if (ret < 0)
     {
       syslog(LOG_ERR,
              "ERROR: Failed to initialize SHA: %d\n", ret);
     }
+#  endif
+
+#  if defined(CONFIG_ESPRESSIF_AES_ACCELERATOR)
+  ret = esp_aes_init();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to initialize AES: %d\n", ret);
+    }
+#  endif
 #endif
 
 #ifdef CONFIG_FS_PROCFS
@@ -317,22 +334,14 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_RT_TIMER
-  ret = esp32s3_rt_timer_init();
-  if (ret < 0)
-    {
-      syslog(LOG_ERR, "Failed to initialize RT timer: %d\n", ret);
-    }
-#endif
-
 #ifdef CONFIG_ESP_RMT
-  ret = board_rmt_txinitialize(RMT_TXCHANNEL, RMT_OUTPUT_PIN);
+  ret = board_rmt_txinitialize(RMT_OUTPUT_PIN);
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: board_rmt_txinitialize() failed: %d\n", ret);
     }
 
-  ret = board_rmt_rxinitialize(RMT_RXCHANNEL, RMT_INPUT_PIN);
+  ret = board_rmt_rxinitialize(RMT_INPUT_PIN);
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: board_rmt_txinitialize() failed: %d\n", ret);
@@ -350,9 +359,9 @@ int esp32s3_bringup(void)
 #endif
 
 #ifdef CONFIG_RTC_DRIVER
-  /* Instantiate the ESP32-S3 RTC driver */
+  /* Instantiate the RTC driver */
 
-  ret = esp32s3_rtc_driverinit();
+  ret = esp_rtc_driverinit();
   if (ret < 0)
     {
       syslog(LOG_ERR,
@@ -564,8 +573,8 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_AES_ACCELERATOR
-  ret = esp32s3_aes_init();
+#ifdef CONFIG_ESPRESSIF_AES_ACCELERATOR
+  ret = esp_aes_init();
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: Failed to initialize AES: %d\n", ret);
@@ -573,7 +582,7 @@ int esp32s3_bringup(void)
 #ifdef CONFIG_ESP32S3_AES_ACCELERATOR_TEST
   else
     {
-      esp32s3_aes_test();
+      esp_aes_test();
     }
 #endif
 #endif

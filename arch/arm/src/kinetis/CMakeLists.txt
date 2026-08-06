@@ -125,4 +125,14 @@ if(CONFIG_NET)
 
 endif()
 
+if(CONFIG_ANALOG)
+  if(CONFIG_DAC)
+    list(APPEND SRCS kinetis_dac.c)
+  endif()
+endif()
+
+if(CONFIG_KINETIS_PIT)
+  list(APPEND SRCS kinetis_oneshot_pit.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})

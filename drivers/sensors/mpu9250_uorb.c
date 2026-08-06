@@ -29,7 +29,7 @@
 #include <errno.h>
 #include <math.h>
 #include <stdio.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <string.h>
 #include <limits.h>
 #include <nuttx/mutex.h>
@@ -50,6 +50,12 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+/* Only float data type supported now */
+
+#ifdef CONFIG_SENSORS_USE_B16
+#  error fixed-point data type not supported yet
+#endif
 
 #define  MPU9250_AKM_DEV_ID                 0x48  /* Magnetometer device ID */
 #define  MIN(x, y)         (x) > (y) ? (y) : (x)
@@ -381,6 +387,7 @@ static const struct sensor_ops_s g_mpu9250_ops =
   NULL,                 /* set_calibvalue */
   NULL,                 /* calibrate */
   NULL,                 /* get_info */
+  NULL,                 /* set_nonwakeup */
   mpu9250_control       /* control */
 };
 

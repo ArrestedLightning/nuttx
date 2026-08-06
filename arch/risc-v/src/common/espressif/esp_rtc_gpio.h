@@ -75,10 +75,54 @@ typedef enum esp_rtc_gpio_mode_e
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ESPRESSIF_RTCIO_IRQ
+#if defined(CONFIG_ESPRESSIF_RTCIO_IRQ) && defined(CONFIG_ARCH_CHIP_ESP32C3)
 void esp_rtcioirqinitialize(void);
 #else
 #  define esp_rtcioirqinitialize()
+#endif
+
+/****************************************************************************
+ * Name: esp_rtcioirqattach
+ *
+ * Description:
+ *   Attach an interrupt handler to a specified RTC IRQ
+ *
+ * Input Parameters:
+ *   irq     - RTC IRQ number to attach the handler to
+ *   handler - Interrupt handler function
+ *   arg     - Argument to pass to the handler
+ *
+ * Returned Value:
+ *   Zero (OK) is returned on success; A negated errno value is returned
+ *   to indicate the nature of any failure.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_ESPRESSIF_RTCIO_IRQ
+int esp_rtcioirqattach(int irq, xcpt_t handler, void *arg);
+#else
+#  define esp_rtcioirqattach(irq, handler, arg) (-ENOSYS)
+#endif
+
+/****************************************************************************
+ * Name: esp_rtcioirqdetach
+ *
+ * Description:
+ *   Detach an interrupt handler from a specified RTC IRQ
+ *
+ * Input Parameters:
+ *   irq - RTC IRQ number to detach the handler from
+ *
+ * Returned Value:
+ *   Zero (OK) is returned on success; A negated errno value is returned
+ *   to indicate the nature of any failure.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_ESPRESSIF_RTCIO_IRQ
+int esp_rtcioirqdetach(int irq);
+#else
+#  define esp_rtcioirqdetach(irq) (-ENOSYS)
 #endif
 
 /****************************************************************************
@@ -121,7 +165,7 @@ void esp_rtcioirqdisable(int irq);
 #  define esp_rtcioirqdisable(irq)
 #endif
 
-#ifdef CONFIG_ARCH_CHIP_ESP32C6
+#if defined(CONFIG_ARCH_CHIP_ESP32C6) || defined(CONFIG_ARCH_CHIP_ESP32P4)
 /****************************************************************************
  * Name: esp_rtcio_config_gpio
  *
@@ -171,7 +215,7 @@ int esp_rtcio_read(int pin);
  ****************************************************************************/
 
 void esp_rtcio_write(int pin, bool value);
-#endif /* CONFIG_ARCH_CHIP_ESP32C6 */
+#endif /* CONFIG_ARCH_CHIP_ESP32C6 || CONFIG_ARCH_CHIP_ESP32P4 */
 
 #endif /* __ASSEMBLY__ */
 #endif /* __ARCH_RISC_V_SRC_COMMON_ESPRESSIF_ESP_RTC_GPIO_H */

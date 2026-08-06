@@ -33,7 +33,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <arch/board/board.h>
 #include <nuttx/irq.h>
@@ -52,8 +52,12 @@
 #include "periph_ctrl.h"
 #include "hal/twai_hal.h"
 #include "hal/twai_ll.h"
+#include "hal/twai_periph.h"
 #include "soc/gpio_sig_map.h"
 #include "soc/reg_base.h"
+#ifdef CONFIG_PM
+#  include "include/esp_pm.h"
+#endif
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -95,11 +99,13 @@
 #  endif
 #endif
 
-#ifdef CONFIG_ARCH_CHIP_ESP32C3_GENERIC
+#if defined(CONFIG_ARCH_CHIP_ESP32C3)
 #  define INT_ENA_REG(hw)       hw->interrupt_enable_reg.val
+#elif defined(CONFIG_ARCH_CHIP_ESP32P4)
+#  define INT_ENA_REG(hw)       hw->interrupt_ena.val
 #else
 #  define INT_ENA_REG(hw)       hw->interrupt_enable.val
-#endif /* CONFIG_ARCH_CHIP_ESP32C3_GENERIC */
+#endif /* CONFIG_ARCH_CHIP_ESP32C3 */
 
 #if !SOC_RCC_IS_INDEPENDENT
 #  define TWAI_RCC_ATOMIC() PERIPH_RCC_ATOMIC()
@@ -139,6 +145,9 @@ struct esp_twai_dev_s
   int8_t cpuint;                  /* CPU interrupt assigned to this TWAI */
   twai_hal_context_t ctx;         /* Context struct of common layer */
   twai_timing_config_t t_config;  /* Timing struct of common layer */
+#ifdef CONFIG_PM
+  esp_pm_lock_handle_t pm_lock;   /* Power management lock */
+#endif
 };
 
 /****************************************************************************
@@ -187,6 +196,9 @@ static struct esp_twai_dev_s g_twai0priv =
   .port             = 0,
   .cpuint           = -ENOMEM,
   .t_config         = TWAI0_TIMING_CONFIG,
+#ifdef CONFIG_PM
+  .pm_lock          = NULL,
+#endif
 };
 
 static struct can_dev_s g_twai0dev =
@@ -202,6 +214,9 @@ static struct esp_twai_dev_s g_twai1priv =
   .port             = 1,
   .cpuint           = -ENOMEM,
   .t_config         = TWAI1_TIMING_CONFIG,
+#ifdef CONFIG_PM
+  .pm_lock          = NULL,
+#endif
 };
 
 static struct can_dev_s g_twai1dev =
@@ -270,6 +285,13 @@ static void esp_twai_reset(struct can_dev_s *dev)
   ASSERT(ret);
   twai_hal_configure(&priv->ctx, &priv->t_config, &f_config, 0);
 
+#ifdef CONFIG_PM
+  if (priv->pm_lock)
+    {
+      esp_pm_lock_acquire(priv->pm_lock);
+    }
+#endif
+
   /* Restart the TWAI */
 
   twai_hal_start(&priv->ctx);
@@ -315,7 +337,7 @@ static int esp_twai_setup(struct can_dev_s *dev)
 
   twai_ll_get_and_clear_intrs(priv->ctx.dev); /* clear latched interrupts */
 
-  irq = twai_controller_periph_signals.controllers[priv->port].irq_id;
+  irq = twai_periph_signals[priv->port].irq_id;
 
   if (priv->cpuint != -ENOMEM)
     {
@@ -326,24 +348,14 @@ static int esp_twai_setup(struct can_dev_s *dev)
 
   priv->cpuint = esp_setup_irq(irq,
                                ESP_IRQ_PRIORITY_DEFAULT,
-                               ESP_IRQ_TRIGGER_LEVEL);
+                               ESP_IRQ_TRIGGER_LEVEL,
+                               esp_twai_interrupt,
+                               dev);
   if (priv->cpuint < 0)
     {
       /* Failed to allocate a CPU interrupt of this type. */
 
       ret = priv->cpuint;
-      leave_critical_section(flags);
-
-      return ret;
-    }
-
-  ret = irq_attach(ESP_SOURCE2IRQ(irq), esp_twai_interrupt, dev);
-  if (ret != OK)
-    {
-      /* Failed to attach IRQ, so CPU interrupt must be freed. */
-
-      esp_teardown_irq(irq, priv->cpuint);
-      priv->cpuint = -ENOMEM;
       leave_critical_section(flags);
 
       return ret;
@@ -385,15 +397,11 @@ static void esp_twai_shutdown(struct can_dev_s *dev)
     {
       int irq;
 
-      irq = twai_controller_periph_signals.controllers[priv->port].irq_id;
+      irq = twai_periph_signals[priv->port].irq_id;
 
       /* Disable cpu interrupt */
 
       up_disable_irq(ESP_SOURCE2IRQ(irq));
-
-      /* Dissociate the IRQ from the ISR */
-
-      irq_detach(ESP_SOURCE2IRQ(irq));
 
       /* Free cpu interrupt that is attached to this peripheral */
 
@@ -751,6 +759,8 @@ static int esp_twai_interrupt(int irq, void *context, void *arg)
 
   if ((regval & TWAI_LL_INTR_RI) != 0)
     {
+      twai_frame_header_t header;
+
       memset(&hdr, 0, sizeof(hdr));
       memset(data, 0, sizeof(data));
 
@@ -759,11 +769,13 @@ static int esp_twai_interrupt(int irq, void *context, void *arg)
       /* Release the receive buffer */
 
       twai_ll_set_cmd_release_rx_buffer(priv->ctx.dev);
-      twai_ll_parse_frame_buffer(&rx_frame, &id, &dlc, data,
-                                 TWAI_FRAME_MAX_LEN, &flags);
-      hdr.ch_id = id;
-      hdr.ch_dlc = dlc;
-      hdr.ch_rtr = (flags && TWAI_MSG_FLAG_RTR) ? 1 : 0;
+
+      twai_hal_parse_frame(&priv->ctx, &rx_frame, &header, data,
+                           TWAI_FRAME_MAX_LEN);
+
+      hdr.ch_id = header.id;
+      hdr.ch_dlc = header.dlc;
+      hdr.ch_rtr = (header.rtr && TWAI_MSG_FLAG_RTR) ? 1 : 0;
 
       can_receive(dev, &hdr, data);
     }
@@ -806,6 +818,10 @@ struct can_dev_s *esp_twaiinitialize(int port)
 {
   struct can_dev_s *dev;
   irqstate_t flags;
+#ifdef CONFIG_PM
+  int ret;
+  struct esp_twai_dev_s *priv;
+#endif
 
   caninfo("TWAI%" PRIu8 "\n",  port);
 
@@ -814,8 +830,8 @@ struct can_dev_s *esp_twaiinitialize(int port)
 #ifdef CONFIG_ESPRESSIF_TWAI0
   if (port == 0)
     {
-      int tx_sig = twai_controller_periph_signals.controllers[0].tx_sig;
-      int rx_sig = twai_controller_periph_signals.controllers[0].rx_sig;
+      int tx_sig = twai_periph_signals[0].tx_sig;
+      int rx_sig = twai_periph_signals[0].rx_sig;
 
       /* Configure CAN GPIO pins */
 
@@ -833,8 +849,8 @@ struct can_dev_s *esp_twaiinitialize(int port)
 #ifdef CONFIG_ESPRESSIF_TWAI1
   if (port == 1)
     {
-      int tx_sig = twai_controller_periph_signals.controllers[1].tx_sig;
-      int rx_sig = twai_controller_periph_signals.controllers[1].rx_sig;
+      int tx_sig = twai_periph_signals[1].tx_sig;
+      int rx_sig = twai_periph_signals[1].rx_sig;
 
       /* Configure CAN GPIO pins */
 
@@ -854,6 +870,34 @@ struct can_dev_s *esp_twaiinitialize(int port)
       leave_critical_section(flags);
       return NULL;
     }
+
+#ifdef CONFIG_PM
+  priv = (struct esp_twai_dev_s *)dev->cd_priv;
+
+  if (priv->pm_lock == NULL)
+    {
+#  if TWAI_LL_SUPPORT(APB_CLK)
+      if (TWAI_CLK_SRC_DEFAULT == TWAI_CLK_SRC_APB)
+        {
+          ret = esp_pm_lock_create(ESP_PM_APB_FREQ_MAX,
+                                   0,
+                                   twai_periph_signals[port].module_name,
+                                   &priv->pm_lock);
+        }
+#  else
+      ret = esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP,
+                               0,
+                               twai_periph_signals[port].module_name,
+                               &priv->pm_lock);
+#  endif
+      if (ret != OK)
+        {
+          canerr("Failed to create TWAI%" PRIu8 "PM lock\n", port);
+          leave_critical_section(flags);
+          return NULL;
+        }
+    }
+#endif
 
   /* Then just perform a TWAI reset operation */
 

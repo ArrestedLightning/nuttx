@@ -259,6 +259,7 @@ Network Interface Management
   - :c:func:`netlib_ifup`
   - :c:func:`netlib_ifdown`
   - :c:func:`netlib_set_mtu`
+  - :c:func:`netlib_check_ifconflict`
 
 .. c:function:: int netlib_getifstatus(const char *ifname, uint8_t *flags)
 
@@ -293,6 +294,133 @@ Network Interface Management
   :param mtu: MTU value in bytes.
 
   :return: 0 on success; -1 on error with ``errno`` set appropriately.
+
+.. c:function:: int netlib_check_ifconflict(const char *ifname)
+
+  Check the IP address conflict status for a network interface. This function
+  reads the conflict status from the procfs file system (``/proc/net/<ifname>``)
+  which is populated by the ARP Address Conflict Detection (ACD) module.
+
+  :param ifname: Network interface name (e.g., ``"eth0"``).
+
+  :return: 0 if no conflict is detected; 1 if a conflict is detected; a negative
+           value on error with ``errno`` set appropriately.
+
+Network Buffer Statistics
+==========================
+
+  - :c:func:`netlib_get_iobinfo`
+
+.. c:function:: int netlib_get_iobinfo(struct iob_stats_s *iob)
+
+  Get the network IOB (I/O Buffer) statistics. This function reads IOB usage
+  information from the procfs file system (``/proc/iobinfo``) which provides
+  details about the network packet buffer pool.
+
+  IOB buffers are used by the NuttX network stack to buffer network packets
+  during transmission and reception. This function allows monitoring the IOB
+  buffer pool to detect potential buffer exhaustion or throttling conditions.
+
+  :param iob: Pointer to an ``iob_stats_s`` structure to receive the IOB
+              statistics. The structure contains the following fields:
+
+              - ``ntotal``: Total number of IOB buffers configured
+                (``CONFIG_IOB_NBUFFERS``)
+              - ``nfree``: Current number of free IOB buffers available
+              - ``nwait``: Number of tasks waiting for IOB buffers (when
+                ``nfree < 0``)
+              - ``nthrottle``: Number of IOB buffers that are throttled (when
+                below ``CONFIG_IOB_THROTTLE`` threshold)
+
+  :return: 0 on success; a negative value on failure with ``errno`` set
+           appropriately.
+
+  **Note:** This function requires ``CONFIG_MM_IOB`` to be enabled. The IOB
+  statistics are provided by the kernel's IOB buffer management system and
+  reflect the current state of the network packet buffer pool.
+
+Network Connectivity
+=====================
+
+  - :c:func:`netlib_check_ipconnectivity`
+  - :c:func:`netlib_check_ifconnectivity`
+  - :c:func:`netlib_check_httpconnectivity`
+
+.. c:function:: int netlib_check_ipconnectivity(FAR const char *ip, int timeout, int retry)
+
+  Check network connectivity to a specified IPv4 address using ICMP ping. This
+  function sends ICMP echo requests to the target address and counts the number
+  of replies received.
+
+  :param ip: IPv4 address string to check (e.g., ``"192.168.1.1"``). If ``NULL``,
+             the function will use the default DNS server address configured via
+             ``CONFIG_NETDB_DNSSERVER_IPv4ADDR`` (if available).
+  :param timeout: Maximum timeout for each ping attempt in milliseconds.
+  :param retry: Number of ping attempts to send.
+
+  :return: Number of replies received (0 or positive) on success. A value of 0
+           indicates that no replies were received (network unreachable or timeout).
+           A negative value indicates an error occurred (e.g., ``-EINVAL`` if ``ip``
+           is ``NULL`` and no DNS server is configured).
+
+  **Note:** This function requires ``CONFIG_NETUTILS_PING`` to be enabled. The
+  function is blocking and will wait for all ping attempts to complete before
+  returning.
+
+.. c:function:: int netlib_check_ifconnectivity(FAR const char *ifname, int timeout, int retry)
+
+  Check network interface connectivity by pinging the gateway. This function
+  retrieves the default gateway address for the specified network interface and
+  then sends ICMP echo requests to the gateway to verify connectivity.
+
+  :param ifname: Network interface name (e.g., ``"eth0"``, ``"wlan0"``).
+  :param timeout: Maximum timeout for each ping attempt in milliseconds.
+  :param retry: Number of ping attempts to send.
+
+  :return: Number of gateway ping replies received (0 or positive) on success.
+           A value of 0 indicates that no replies were received (gateway unreachable
+           or timeout). A negative value indicates an error occurred (e.g., if the
+           gateway address cannot be retrieved for the interface, or if the gateway
+           address is invalid).
+
+  **Note:** This function requires ``CONFIG_NETUTILS_PING`` to be enabled. The
+  function is blocking and will wait for all ping attempts to complete before
+  returning. The function internally calls :c:func:`netlib_get_dripv4addr` to
+  retrieve the gateway address and then uses :c:func:`netlib_check_ipconnectivity`
+  to perform the actual ping test.
+
+.. c:function:: int netlib_check_httpconnectivity(FAR const char *host, FAR const char *getmsg, int port, int expect_code)
+
+  Check HTTP service connectivity by sending an HTTP GET request and verifying
+  the response status code. This function establishes a TCP connection to the
+  specified host and port, sends an HTTP/1.1 GET request for the specified path,
+  and validates that the server returns the expected HTTP status code.
+
+  :param host: Remote hostname or IP address (e.g., ``"www.example.com"`` or
+               ``"192.168.1.1"``). The function supports DNS resolution if
+               ``CONFIG_LIBC_NETDB`` is enabled, otherwise it expects a numeric
+               IPv4 address.
+  :param getmsg: URL path for the HTTP GET request (e.g., ``"index.html"`` or
+                 ``"api/health"``). An empty string (``""``) requests the root path
+                 (``"/"``). The function automatically prepends a forward slash
+                 to the path.
+  :param port: TCP port number of the HTTP server (typically 80 for HTTP, or
+               8080 for alternative HTTP services).
+  :param expect_code: Expected HTTP status code (e.g., ``200`` for success,
+                      ``404`` for not found). The function returns success only
+                      if the server returns this exact status code.
+
+  :return: 0 on success (HTTP status code matches expected value). A negative
+           value on failure, which may be a negative HTTP status code (e.g.,
+           ``-404``) if the server returned a different status code than expected,
+           or a negative error code (e.g., ``-EINVAL``, ``-ENETUNREACH``) if
+           connection, DNS resolution, or other errors occurred.
+
+  **Note:** This function is blocking and will wait for the HTTP request and
+  response to complete. The function only reads the first 256 bytes of the HTTP
+  response to extract the status code. It does not support HTTPS (TLS/SSL) and
+  only works with HTTP/1.1 servers. The function is useful for HTTP service
+  health checks, network diagnostics, and automated service monitoring.
 
 ARP Table Support
 ==================

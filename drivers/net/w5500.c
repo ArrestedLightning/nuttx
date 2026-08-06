@@ -37,7 +37,7 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <arpa/inet.h>
 
@@ -1513,7 +1513,7 @@ static void w5500_interrupt_work(FAR void *arg)
    * thread has been configured.
    */
 
-  net_lock();
+  netdev_lock(&self->w_dev);
 
   /* Process pending Ethernet interrupts.  Read IR, MIR and SIR in one shot
    * to optimize latency, although MIR is not actually used.
@@ -1592,7 +1592,7 @@ static void w5500_interrupt_work(FAR void *arg)
     }
 
 done:
-  net_unlock();
+  netdev_unlock(&self->w_dev);
 
   /* Re-enable Ethernet interrupts */
 
@@ -1602,7 +1602,7 @@ done:
 
 error:
   w5500_fence(self);
-  net_unlock();
+  netdev_unlock(&self->w_dev);
 }
 
 /****************************************************************************
@@ -1667,7 +1667,7 @@ static void w5500_txtimeout_work(FAR void *arg)
    * thread has been configured.
    */
 
-  net_lock();
+  netdev_lock(&self->w_dev);
 
   /* Increment statistics and dump debug info */
 
@@ -1684,7 +1684,7 @@ static void w5500_txtimeout_work(FAR void *arg)
       devif_poll(&self->w_dev, w5500_txpoll);
     }
 
-  net_unlock();
+  netdev_unlock(&self->w_dev);
 }
 
 /****************************************************************************
@@ -1772,6 +1772,8 @@ static int w5500_ifup(FAR struct net_driver_s *dev)
   self->w_bifup = true;
   self->lower->enable(self->lower, true);
 
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -1818,6 +1820,9 @@ static int w5500_ifdown(FAR struct net_driver_s *dev)
 
   self->w_bifup = false;
   leave_critical_section(flags);
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 
@@ -1848,7 +1853,7 @@ static void w5500_txavail_work(FAR void *arg)
    * thread has been configured.
    */
 
-  net_lock();
+  netdev_lock(&priv->w_dev);
 
   /* Ignore the notification if the interface is not yet up */
 
@@ -1861,7 +1866,7 @@ static void w5500_txavail_work(FAR void *arg)
       devif_poll(&priv->w_dev, w5500_txpoll);
     }
 
-  net_unlock();
+  netdev_unlock(&priv->w_dev);
 }
 
 /****************************************************************************

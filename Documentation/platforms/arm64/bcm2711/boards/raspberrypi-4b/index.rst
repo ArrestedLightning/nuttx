@@ -198,6 +198,36 @@ nsh
 A simple configuration with NSH on the Mini-UART console, accessible using a TTL
 cable connected to GPIO 14 & 15.
 
+nxinit
+------
+
+This configuration has the same features as the ``sd`` configuration, but uses
+the :doc:`NXInit </applications/system/nxinit/index>` init system instead of NSH
+directly. The ``init.rc`` init script is pulled from the SD card. It is
+recommended to use the following script:
+
+.. code:: text
+
+   on boot
+       start console
+   service console nsh
+       class core
+       restart_period 1000
+
+coremark
+--------
+
+This configuration boots directly into the :doc:`coremark
+</applications/benchmarks/coremark/index>` benchmark and displays the results of
+the test over the serial console.
+
+ostest
+------
+
+This configuration boots directly into :doc:`ostest
+</applications/testing/ostest/index>` and displays the results of the test over
+the serial console. The test runs 5 times.
+
 sd
 --
 
@@ -239,12 +269,12 @@ colourful rectangles on the screen.
    ``memcpy``'d to the frame buffer, the image will be clear. I have not
    modified the frame buffer example though since this is its own limitation.
 
-.. todo::
+.. note::
 
-   The frame-buffer driver always sets the physical and virtual display
-   resolution to 1080 x 1920 pixels with a depth of 32 bits per pixel. Other
-   options cannot yet be configured via Kconfig, nor is there any kind of
-   negotiation with the display to agree on some maximum quality options.
+   The frame buffer driver currently uses the resolution obtained by querying
+   the physical display. It is also possible to use
+   ``CONFIG_BCM2711_FB_FORCE_RESOLUTION=y`` to force the request of your
+   configured default resolution instead.
 
 lvgl
 ----
@@ -267,3 +297,11 @@ application. It renders a Game of Life simulation to the HDMI video output.
 Since this configuration also enables the frame buffer, it comes with the same
 limitations as those in ``fb``. However, the ``cgol`` application is double
 buffered, so it will not experience any rendering artifacts.
+
+smp
+---
+
+This configuration leverages all four A72 cores of the BCM2711. It comes with
+the standard NSH shell, :doc:`/applications/testing/getprime/index`,
+:doc:`/applications/testing/ostest/index`, and
+:doc:`/applications/testing/smp/index` tests.

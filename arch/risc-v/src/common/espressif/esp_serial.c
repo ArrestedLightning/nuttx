@@ -27,7 +27,7 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -55,10 +55,9 @@
 #endif
 
 #include "esp_clk_tree.h"
-#include "esp_private/uart_share_hw_ctrl.h"
 #include "esp_private/esp_clk_tree_common.h"
 #include "hal/uart_hal.h"
-#include "soc/uart_periph.h"
+#include "hal/uart_periph.h"
 #include "soc/clk_tree_defs.h"
 #include "periph_ctrl.h"
 
@@ -465,6 +464,7 @@ static int esp_setup(uart_dev_t *dev)
   soc_module_clk_t src_clk;
   uint32_t sclk_freq;
   bool success = false;
+  irqstate_t flags;
 
   /* Enable the UART Clock */
 
@@ -476,7 +476,7 @@ static int esp_setup(uart_dev_t *dev)
                                ESP_CLK_TREE_SRC_FREQ_PRECISION_CACHED,
                                &sclk_freq);
 
-  esp_os_enter_critical(&(g_uart_context[priv->id].spinlock));
+  flags = enter_critical_section();
 
   /* Initialize UART module */
 #ifdef CONFIG_ESPRESSIF_LP_UART
@@ -487,7 +487,7 @@ static int esp_setup(uart_dev_t *dev)
       LP_UART_SRC_CLK_ATOMIC()
         {
           lp_uart_ll_enable_bus_clock(0, true);
-          lp_uart_ll_set_source_clk(priv->hal->dev, sclk_freq);
+          lp_uart_ll_set_source_clk(priv->hal->dev, LP_UART_SCLK_DEFAULT);
           lp_uart_ll_sclk_enable(0);
         }
     }
@@ -500,12 +500,27 @@ static int esp_setup(uart_dev_t *dev)
   if (priv->id < SOC_UART_HP_NUM)
     {
       esp_clk_tree_enable_src(UART_SCLK_XTAL, true);
-      HP_UART_SRC_CLK_ATOMIC()
+      PERIPH_RCC_ATOMIC()
         {
           uart_hal_set_sclk(priv->hal, UART_SCLK_XTAL);
           success = uart_hal_set_baudrate(priv->hal, priv->baud, sclk_freq);
         }
     }
+#ifdef CONFIG_ESPRESSIF_LP_UART
+  else
+    {
+      /* Override protocol parameters from the configuration */
+
+      if (!lp_uart_ll_set_baudrate(priv->hal->dev, priv->baud, sclk_freq))
+        {
+          /* Unachievable baud rate */
+
+          return ESP_FAIL;
+        }
+
+      success = true;
+    }
+#endif
 
   uart_hal_set_parity(priv->hal, priv->parity);
   set_data_length(priv);
@@ -567,7 +582,7 @@ static int esp_setup(uart_dev_t *dev)
   else
 #endif
 
-  esp_os_exit_critical(&(g_uart_context[priv->id].spinlock));
+  leave_critical_section(flags);
 
   if (success == false)
     {
@@ -613,7 +628,7 @@ static void esp_shutdown(uart_dev_t *dev)
  * Description:
  *   Configure the UART to operation in interrupt driven mode. This method
  *   is called when the serial port is opened. Normally, this is just after
- *   the the setup() method is called, however, the serial console may
+ *   the setup() method is called, however, the serial console may
  *   operate in a non-interrupt driven mode during the boot phase.
  *
  *   RX and TX interrupts are not enabled when by the attach method (unless
@@ -643,18 +658,21 @@ static int esp_attach(uart_dev_t *dev)
   source = uart_periph_signal[priv->id].irq;
 
   priv->cpuint = esp_setup_irq(source, priv->int_pri,
-                               ESP_IRQ_TRIGGER_LEVEL);
+                               ESP_IRQ_TRIGGER_LEVEL,
+                               uart_handler,
+                               dev);
 
   /* Attach and enable the IRQ */
 
-  ret = irq_attach(ESP_SOURCE2IRQ(source), uart_handler, dev);
-  if (ret == OK)
+  if (priv->cpuint >= 0)
     {
       up_enable_irq(ESP_SOURCE2IRQ(source));
+      ret = OK;
     }
   else
     {
       up_disable_irq(ESP_SOURCE2IRQ(source));
+      ret = -EINVAL;
     }
 
   return ret;
@@ -688,7 +706,6 @@ static void esp_detach(uart_dev_t *dev)
   /* Disable and detach the CPU interrupt */
 
   up_disable_irq(ESP_SOURCE2IRQ(source));
-  irq_detach(ESP_SOURCE2IRQ(source));
 
   /* Disassociate the peripheral interrupt from the CPU interrupt */
 
@@ -844,7 +861,11 @@ static bool esp_txempty(uart_dev_t *dev)
 {
   struct esp_uart_s *priv = dev->priv;
 
+#if defined(CONFIG_ARCH_CHIP_ESP32P4)
+  return priv->hal->dev->int_raw.txfifo_empty_int_raw != 0;
+#else
   return priv->hal->dev->int_raw.txfifo_empty != 0;
+#endif
 }
 
 /****************************************************************************

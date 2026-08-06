@@ -109,6 +109,86 @@ show in units of mV)::
     3: channel: 2 value: 103
     4: channel: 3 value: 104
 
+autopm
+------
+
+This configuration makes the device automatically enter the low power consumption mode
+when in the idle state, powering off the cpu and other peripherals.
+
+In minimum power save mode, the station wakes up every DTIM to receive a beacon. The broadcast
+data will not be lost because it is transmitted after DTIM. However, it can not save much more
+power if DTIM is short as the DTIM is determined by the access point.
+
+During ping operation power consumption should drop from 90-100mA to 30-40mA.
+
+ble
+---
+
+This configuration is used to enable the Bluetooth Low Energy (BLE) of
+ESP32-C6 chip.
+
+To test it, just run the following commands below.
+
+Confirm that bnep interface exist::
+
+    nsh> ifconfig
+    bnep0   Link encap:UNSPEC at DOWN mtu -9
+        inet addr:0.0.0.0 DRaddr:0.0.0.0 Mask:0.0.0.0
+
+Get basic information from it::
+
+    nsh> bt bnep0 info
+    Device: bnep0
+    BDAddr: 8c:bf:ea:b3:4c:ea
+    Flags:  0000
+    Free:   20
+      ACL:  20
+      SCO:  0
+    Max:
+      ACL:  24
+      SCO:  0
+    MTU:
+      ACL:  70
+      SCO:  70
+    Policy: 0
+    Type:   0
+
+Start the scanning process::
+
+    nsh> bt bnep0 scan start
+
+Wait a little bit before stopping it.
+
+Then after some minutes stop it::
+
+    nsh> bt bnep0 scan stop
+
+Get the list of BLE devices found around you::
+
+    nsh> bt bnep0 scan get
+    Scan result:
+    1.     addr:           d7:c4:e6:xx:xx:xx type: 0
+           rssi:            -62
+           response type:   4
+           advertiser data: 10 09 4d 69 20 XX XX XX XX XX XX XX XX XX XX 20                      e
+    2.     addr:           cb:23:18:xx:xx:xx type: 0
+           rssi:            -60
+           response type:   0
+           advertiser data: 02 01 06 1b ff XX XX XX ff ff ff ff ff ff ff ff                      8
+    3.     addr:           cb:23:18:xx:xx:xx type: 0
+           rssi:            -60
+           response type:   4
+           advertiser data: 10 09 4d 69 20 XX XX XX XX XX XX XX XX XX XX 20                      e
+    4.     addr:           d7:c4:e6:xx:xx:xx type: 0
+           rssi:            -62
+           response type:   0
+           advertiser data: 02 01 06 1b ff XX XX XX ff ff ff ff ff ff ff ff                      e
+    5.     addr:           d7:c4:e6:xx:xx:xx type: 0
+           rssi:            -62
+           response type:   4
+           advertiser data: 10 09 4d 69 20 XX XX XX XX XX XX XX XX XX XX 20                      e
+    nsh>
+
 bmp180
 ------
 
@@ -389,6 +469,73 @@ ostest
 This is the NuttX test at ``apps/testing/ostest`` that is run against all new
 architecture ports to assure a correct implementation of the OS.
 
+pm
+-------
+
+This config demonstrate the use of power management.
+You can use the ``pmconfig`` command to check current power state and time spent in other power states.
+Also you can define time will spend in standby and sleep modes::
+
+    $ make menuconfig
+    -> Board Selection
+        -> (15) PM_STANDBY delay (seconds)
+           (0)  PM_STANDBY delay (nanoseconds)
+           (20) PM_SLEEP delay (seconds)
+           (0)  PM_SLEEP delay (nanoseconds)
+
+Timer wakeup is not only way to wake up the chip. Other wakeup modes include:
+
+- EXT1 wakeup mode: Uses RTC GPIO pins to wake up the chip. Enabled with ``CONFIG_PM_EXT1_WAKEUP`` option.
+- ULP coprocessor wakeup mode: Uses ULP co-processor to wake up the chip. Enabled with ``CONFIG_PM_ULP_WAKEUP`` option.
+- GPIO wakeup mode: Uses GPIO pins to wakeup the chip. Only wakes up the chip from ``PM_STANDBY`` mode and requires ``CONFIG_PM_GPIO_WAKEUP``.
+- UART wakeup mode: Uses UART to wakeup the chip. Only wakes up the chip from ``PM_STANDBY`` mode and requires ``CONFIG_PM_GPIO_WAKEUP``.
+
+Before switching PM status, you need to query the current PM status to call correct number of relax command to correct modes::
+
+    nsh> pmconfig
+    Last state 0, Next state 0
+
+    /proc/pm/state0:
+    DOMAIN0           WAKE         SLEEP         TOTAL
+    normal          0s 00%        0s 00%        0s 00%
+    idle            0s 00%        0s 00%        0s 00%
+    standby         0s 00%        0s 00%        0s 00%
+    sleep           0s 00%        0s 00%        0s 00%
+
+    /proc/pm/wakelock0:
+    DOMAIN0      STATE     COUNT      TIME
+    system       normal        2        1s
+    system       idle          1        1s
+    system       standby       1        1s
+    system       sleep         1        1s
+
+In this case, needed commands to switch the system into PM idle mode::
+
+    nsh> pmconfig relax normal
+    nsh> pmconfig relax normal
+
+In this case, needed commands to switch the system into PM standby mode::
+
+    nsh> pmconfig relax idle
+    nsh> pmconfig relax normal
+    nsh> pmconfig relax normal
+
+System switch to the PM sleep mode, you need to enter::
+
+    nsh> pmconfig relax standby
+    nsh> pmconfig relax idle
+    nsh> pmconfig relax normal
+    nsh> pmconfig relax normal
+
+Note: When normal mode COUNT is 0, it will switch to the next PM state where COUNT is not 0.
+
+Note: During light sleep, overall current consumption of board should drop from 22mA (without any system load) to 1.3 mA on ESP32-C6 DevkitC-1.
+During deep sleep, current consumption of module (ESP32-C6-WROOM-1) should drop from 22mA (without any system load) to 48 μA.
+
+To save power without using sleep modes, lowering the clock speed is another approach. For dynamic frequency scaling
+``CONFIG_ESPRESSIF_DFS`` option needs to enabled and minimum CPU frequency needs to set under ``CONFIG_ESPRESSIF_MIN_CPU_FREQ`` option.
+With these options, the device scales the CPU clock according to workload.
+
 pwm
 ---
 
@@ -409,6 +556,18 @@ using 1 second delay)::
 
     nsh> qe
 
+random
+------
+
+This configuration shows the use of the ESP32-C6's True Random Number Generator.
+To test it, just run ``rand`` to get 32 randomly generated bytes::
+
+    nsh> rand
+    Reading 8 random numbers
+    Random values (0x3ffe0b00):
+    0000  98 b9 66 a2 a2 c0 a2 ae 09 70 93 d1 b5 91 86 c8  ..f......p......
+    0010  8f 0e 0b 04 29 64 21 72 01 92 7c a2 27 60 6f 90  ....)d!r..|.'`o.
+
 rmt
 ---
 
@@ -422,11 +581,16 @@ RMT symbol, which is represented by ``rmt_item32_t`` in the driver:
 .. figure:: rmt_symbol.png
    :align: center
 
-The example ``rmtchar`` can be used to test the RMT peripheral. Connecting
+The example ``irtest`` can be used to test the RMT peripheral. Connecting
 these pins externally to each other will make the transmitter send RMT items
 and demonstrates the usage of the RMT peripheral::
 
-    nsh> rmtchar
+    nsh> irtest
+    $open_device(/dev/lirc0)
+    $open_device(/dev/lirc1)
+    $write_data(1) 16777229 16 16777235 23
+    $read_data(0,4)
+    16777229, 16, 16777235, 23
 
 **WS2812 addressable RGB LEDs**
 
@@ -535,6 +699,25 @@ If SPI peripherals are already in use you can also use bitbang driver which is a
 software implemented SPI peripheral by enabling `CONFIG_ESPRESSIF_SPI_BITBANG`
 option.
 
+spislv
+------
+
+This configuration enables the SPI2 peripheral in **slave mode** and
+provides the ``spislv`` example application to test data exchange with an
+external SPI master.
+
+After building and flashing the firmware, run the following command on the
+board terminal::
+
+    nsh> spislv -x 5 1a2b3c4d5e
+
+This command enqueues the data sequence ``1a2b3c4d5e`` in the slave buffer.
+On the next transfer, the external SPI master should receive this data back
+from the slave.
+
+By default, SPI2 is used with chip select on GPIO16. The pin mapping can be
+adjusted through ``menuconfig`` under *System type → SPI configuration*.
+
 sdmmc_spi
 ---------
 
@@ -599,6 +782,20 @@ using WPA2.
   for more information.
 
 The ``dhcpd_start`` is necessary to let your board to associate an IP to your smartphone.
+
+temperature_sensor
+------------------
+
+This configuration enables the on-chip temperature sensor driver. The sensor is
+exposed through the uORB interface and can be read with the ``sensortest``
+utility::
+
+    nsh> sensortest temp
+
+tickless
+--------
+
+This configuration enables the support for tickless scheduler mode.
 
 timer
 -----

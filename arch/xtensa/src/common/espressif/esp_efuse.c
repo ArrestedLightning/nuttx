@@ -25,7 +25,7 @@
  ****************************************************************************/
 
 #include <stdlib.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
@@ -42,6 +42,7 @@
 #include "xtensa.h"
 #include "soc/syscon_reg.h"
 #include "esp_efuse_table.h"
+#include "hal/efuse_ll.h"
 #endif
 
 /****************************************************************************
@@ -286,6 +287,7 @@ int esp_efuse_initialize(const char *devpath)
 {
   struct esp_efuse_lowerhalf_s *lower = NULL;
   int ret = OK;
+  irqstate_t flags;
 
   DEBUGASSERT(devpath != NULL);
 
@@ -293,6 +295,7 @@ int esp_efuse_initialize(const char *devpath)
 
   /* Register the efuse upper driver */
 
+  flags = enter_critical_section();
   lower->upper = efuse_register(devpath,
                                 (struct efuse_lowerhalf_s *)lower);
 
@@ -312,6 +315,7 @@ int esp_efuse_initialize(const char *devpath)
   esp_efuse_utility_update_virt_blocks();
 #endif
 
+  leave_critical_section(flags);
   return ret;
 }
 #endif
@@ -342,16 +346,9 @@ uint32_t esp_efuse_hal_chip_revision(void)
   uint32_t combine_value;
   uint32_t chip_ver = 0;
 
-  esp_efuse_read_field_blob(ESP_EFUSE_CHIP_VER_REV1,
-                            &eco_bit0,
-                            ESP_EFUSE_CHIP_VER_REV1[0]->bit_count);
-  esp_efuse_read_field_blob(ESP_EFUSE_CHIP_VER_REV2,
-                            &eco_bit1,
-                            ESP_EFUSE_CHIP_VER_REV2[0]->bit_count);
-  esp_efuse_read_field_blob(ESP_EFUSE_WAFER_VERSION_MINOR,
-                            &minor_chip_version,
-                            ESP_EFUSE_WAFER_VERSION_MINOR[0]->bit_count);
-
+  eco_bit0 = efuse_ll_get_chip_ver_rev1();
+  eco_bit1 = efuse_ll_get_chip_ver_rev2();
+  minor_chip_version = efuse_ll_get_chip_wafer_version_minor();
   eco_bit2 = (getreg32(SYSCON_DATE_REG) & 0x80000000) >> 31;
   combine_value = (eco_bit2 << 2) | (eco_bit1 << 1) | eco_bit0;
 

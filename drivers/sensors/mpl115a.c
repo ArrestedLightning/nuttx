@@ -20,6 +20,19 @@
  *
  ****************************************************************************/
 
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
+
 /* Character driver for the Freescale MPL115A1 Barometer Sensor */
 
 /****************************************************************************
@@ -31,7 +44,7 @@
 #include <stdlib.h>
 #include <fixedmath.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/kmalloc.h>
 #include <nuttx/signal.h>
@@ -268,7 +281,7 @@ static int mpl115a_getpressure(FAR struct mpl115a_dev_s *priv)
   /* These code are from Freescale AN3785 */
 
   c12x2 = ((int32_t)priv->mpl115a_cal_c12 * tadc) >> 11;
-  a1 = (int32_t) (priv->mpl115a_cal_b1 + c12x2);
+  a1 = (int32_t)(priv->mpl115a_cal_b1 + c12x2);
   a1x1 = a1 * padc;
   y1 = (((int32_t)priv->mpl115a_cal_a0) << 10) + a1x1;
   a2x2 = (((int32_t)priv->mpl115a_cal_b2) * tadc) >> 1;

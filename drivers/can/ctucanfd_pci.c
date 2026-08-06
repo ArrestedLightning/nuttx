@@ -27,7 +27,7 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <stdio.h>
 
@@ -739,6 +739,8 @@ static void ctucanfd_chardev_receive(FAR struct ctucanfd_can_s *priv)
   uint16_t                     frc    = 0;
   uint32_t                     regval = 0;
 
+  memset(&hdr, 0, sizeof(hdr));
+
   /* Get frame count */
 
   regval = ctucanfd_getreg(priv, CTUCANFD_RXSETSTAT);
@@ -757,6 +759,14 @@ static void ctucanfd_chardev_receive(FAR struct ctucanfd_can_s *priv)
       /* RX buffer in automatic mode */
 
       buff[0] = ctucanfd_getreg(priv, CTUCANFD_RXDATA);
+
+      /* buff[0] populated the frame->fmt.rwcnt. Check before use. */
+
+      if (frame->fmt.rwcnt > sizeof(buff) / sizeof(buff[0]) - 1)
+        {
+          canerr("ERROR: CAN read/write count is too large.  Dropped\n");
+          return;
+        }
 
       /* Read the rest of data */
 
@@ -1246,6 +1256,14 @@ static FAR netpkt_t *ctucanfd_sock_recv(FAR struct netdev_lowerhalf_s *dev)
   /* RX buffer in automatic mode */
 
   buff[0] = ctucanfd_getreg(priv, CTUCANFD_RXDATA);
+
+  /* buff[0] populated the frame->fmt.rwcnt. Check before use. */
+
+  if (frame->fmt.rwcnt > sizeof(buff) / sizeof(buff[0]) - 1)
+    {
+      canerr("ERROR: CAN read/write count is too large.  Dropped\n");
+      return NULL;
+    }
 
   /* Read the rest of data */
 

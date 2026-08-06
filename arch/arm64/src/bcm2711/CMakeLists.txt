@@ -20,8 +20,11 @@
 
 # BCM2711 specific C source files
 
-set(SRCS bcm2711_boot.c bcm2711_mailbox.c bcm2711_serial.c bcm2711_gpio.c
-         bcm2711_timer.c)
+set(SRCS bcm2711_boot.c bcm2711_mailbox.c bcm2711_serial.c bcm2711_gpio.c)
+
+if(CONFIG_SMP)
+  list(APPEND SRCS bcm2711_cpustart.c)
+endif()
 
 # Early boot logging
 

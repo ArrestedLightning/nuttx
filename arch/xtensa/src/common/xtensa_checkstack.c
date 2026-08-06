@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include <sched.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
@@ -102,8 +102,8 @@ size_t xtensa_stack_check(uintptr_t alloc, size_t size)
    * Skip over the TLS data structure at the bottom of the stack
    */
 
-  start = STACK_ALIGN_UP(alloc);
-  end   = STACK_ALIGN_DOWN(alloc + size);
+  start = STACKFRAME_ALIGN_UP(alloc);
+  end   = STACKFRAME_ALIGN_DOWN(alloc + size);
 
   /* Get the adjusted size based on the top and bottom of the stack */
 
@@ -116,7 +116,7 @@ size_t xtensa_stack_check(uintptr_t alloc, size_t size)
    */
 
   for (ptr = (uint32_t *)start, mark = (size >> 2);
-       *ptr == STACK_COLOR && mark > 0;
+       mark > 0 && *ptr == STACK_COLOR;
        ptr++, mark--);
 
   /* If the stack is completely used, then this might mean that the stack

@@ -31,7 +31,7 @@
 #include <stdlib.h>
 #include <fixedmath.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/arch.h>
 #include <nuttx/fs/fs.h>
@@ -51,6 +51,12 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+/* Only float data type supported now */
+
+#ifdef CONFIG_SENSORS_USE_B16
+#  error fixed-point data type not supported yet
+#endif
 
 #define MS56XX_CMD_RESET              0x1e
 #define MS56XX_CMD_START_ADC_READ     0x00
@@ -485,11 +491,11 @@ static int32_t ms56xx_compensate_temp(FAR struct ms56xx_dev_s *priv,
 
   /* dt = d1 - c5 * 256 */
 
-  dt = temp_raw - ((int32_t) c->c5 << 8);
+  dt = temp_raw - ((int32_t)c->c5 << 8);
 
   /* temp = 2000 + (dt * c6) / 8388608 */
 
-  temp = 2000 + (((int64_t) (dt * c->c6)) >> 23);
+  temp = 2000 + (((int64_t)(dt * c->c6)) >> 23);
 
   /* Save dt that will be used for pressure calibration */
 
@@ -529,8 +535,8 @@ static uint32_t ms56xx_compensate_press(FAR struct ms56xx_dev_s *priv,
   switch (priv->model)
     {
       case MS56XX_MODEL_MS5607:
-        off = ((int64_t) c->c2 << 17) + ((int64_t) (c->c4 * dt) >> 6);
-        sens = ((int64_t) c->c1 << 16) + ((int64_t) (c->c3 * dt) >> 7);
+        off = ((int64_t)c->c2 << 17) + ((int64_t)(c->c4 * dt) >> 6);
+        sens = ((int64_t)c->c1 << 16) + ((int64_t)(c->c3 * dt) >> 7);
 #if defined(CONFIG_MS56XX_SECOND_ORDER_COMPENSATE)
         if (*temp < 2000)
           {
@@ -556,8 +562,8 @@ static uint32_t ms56xx_compensate_press(FAR struct ms56xx_dev_s *priv,
         break;
 
       case MS56XX_MODEL_MS5611:
-        off = ((int64_t) c->c2 << 16) + ((int64_t) (c->c4 * dt) >> 7);
-        sens = ((int64_t) c->c1 << 15) + ((int64_t) (c->c3 * dt) >> 8);
+        off = ((int64_t)c->c2 << 16) + ((int64_t)(c->c4 * dt) >> 7);
+        sens = ((int64_t)c->c1 << 15) + ((int64_t)(c->c3 * dt) >> 8);
 #if defined(CONFIG_MS56XX_SECOND_ORDER_COMPENSATE)
         if (*temp < 2000)
           {

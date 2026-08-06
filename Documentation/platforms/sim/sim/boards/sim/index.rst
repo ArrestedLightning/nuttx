@@ -946,6 +946,17 @@ Of course, this configuration can only be used in environments that support X11!
       -CONFIG_EXAMPLES_NXTERM=n
       +CONFIG_EXAMPLES_NXTERM=y
 
+nxdoom
+------
+
+Play :doc:`NXDoom </applications/games/nxdoom/index>` on the Simulator using X11
+keyboard input and graphics. Read the docs for NXDoom to see how to play.
+
+.. warning::
+
+   X11 keyboard codes are not perfectly translated to the NuttX codec currently,
+   so some controls will not work properly.
+
 nxffs
 -----
 
@@ -1859,6 +1870,43 @@ This is a configuration with sim usbhost support.
    Run sim usbhost with root mode, run sim usbdev or plug-in cdcacm usb device.
    Then you can use ``/dev/ttyACM`` to transfer data.
 
+   Here we will demonstrate an example of interaction between sim usbhost and
+   sim usbdev. Build two executable files using the configurations ``sim:usbdev``
+   and ``sim:usbhost`` respectively.
+
+   Run each executable files as root in different terminals.
+   Terminal 1 (run nuttx binary from sim:usbhost):
+
+   .. code:: console
+
+      $ sudo ./nuttx
+
+   Terminal 2  (run nuttx binary from sim:usbdev):
+
+   .. code:: console
+
+      $ sudo ./nuttx
+
+   Then, run CDCACM in usbdev.
+
+   .. code:: console
+
+      nsh> conn 1
+
+   Enter commands to read CDCACM on the usbhost:
+
+   .. code:: console
+
+      nsh> cat /dev/ttyACM0 &
+
+   Enter commands to write CDCACM on the usbdev:
+
+   .. code:: console
+
+      nsh> echo hello > /dev/ttyACM0
+
+   You can see the data on the usbhost: ``hello``.
+
 login
 -----
 
@@ -1866,13 +1914,13 @@ This is a configuration with login password protection for NSH.
 
 .. note::
 
-   This config has password protection enabled. The login info is:
+   This config has password protection enabled. The default login info is:
 
-   * USERNAME: admin
+   * USERNAME: root
    * PASSWORD: Administrator
 
-   The encrypted password is retained in ``/etc/passwd``. I am sure that you
-   will find this annoying. You can disable the password protection by
+   The encrypted password is retained in ``/etc/passwd``.
+   You can disable the password protection by
    de-selecting ``CONFIG_NSH_CONSOLE_LOGIN=y``.
 
 can
@@ -1947,6 +1995,19 @@ Requirement: ``cansequence`` tool from ``linux-can/can-utils``
       can0  002   [1]  11
       can0  002   [1]  12
 
+
+nxscope
+-------
+
+Configuration demonstrating NxScope stream over simulated UART interface.
+
+The simulated UART must be created on host before running NuttX::
+
+  socat PTY,link=/dev/ttySIM0 PTY,link=/dev/ttyNX0
+
+See :doc:`/applications/examples/nxscope/index` and
+:doc:`/applications/logging/nxscope/index` for more details.
+
 ROMFS System-Init
 =================
 
@@ -1971,24 +2032,23 @@ mounted at ``/etc`` and will look like this at run-time:
    nsh>
 
 ``/etc/init.d/rc.sysinit`` is system init script; ``/etc/init.d/rcS`` is the
-start-up script; ``/etc/passwd`` is a the password file. It supports a single
-user:
+start-up script; ``/etc/passwd`` is the password file.
 
-.. code:: text
+The ``/etc/passwd`` file is auto-generated at build time when
+``CONFIG_BOARD_ETC_ROMFS_PASSWD_ENABLE`` is set.  Enable the option and set
+credentials via ``make menuconfig``:
 
-   USERNAME:  admin
-   PASSWORD:  Administrator
+* ``CONFIG_BOARD_ETC_ROMFS_PASSWD_ENABLE=y``
+* ``CONFIG_NSH_CONSOLE_LOGIN=y`` (required, otherwise login is not enforced)
+* ``CONFIG_BOARD_ETC_ROMFS_PASSWD_USER`` (default: ``root``)
+* ``CONFIG_BOARD_ETC_ROMFS_PASSWD_PASSWORD`` (required, build fails if empty or shorter than 8 characters)
 
-.. code:: console
+The password is hashed with TEA at build time by the host tool
+``tools/mkpasswd``; the plaintext is **not** stored in the firmware.
 
-   nsh> cat /etc/passwd
-   admin:8Tv+Hbmr3pLVb5HHZgd26D:0:0:/
-
-The encrypted passwords in the provided passwd file are only valid if the
-TEA key is set to: 012345678 9abcdef0 012345678 9abcdef0.
-
-Changes to either the key or the password word will require regeneration of the
-``nsh_romfimg.h`` header file.
+For the full description of the build-time password generation mechanism,
+TEA key configuration, file format, and verification steps, see
+:ref:`mkpasswd_autogen`.
 
 The format of the password file is:
 
@@ -2003,6 +2063,21 @@ Where:
 * uid: User ID (0 for now)
 * gid: Group ID (0 for now)
 * home: Login directory (/ for now)
+
+For configuration, verification steps, and TEA key details, see
+:ref:`mkpasswd_autogen`.
+
+Login test inside the simulator
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: console
+
+   $ ./nuttx
+   NuttShell (NSH) NuttX-<version>
+   nsh login: root
+   Password:
+   User Logged-in!
+   nsh>
 
 ``/etc/group`` is a group file. It is not currently used.
 

@@ -35,7 +35,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <time.h>
 #include <sys/time.h>
 #include <sys/param.h>
@@ -61,9 +61,12 @@
 #include "hal/i2c_ll.h"
 #include "soc/system_reg.h"
 #include "soc/gpio_sig_map.h"
-#include "soc/i2c_periph.h"
+#include "hal/i2c_periph.h"
 #if defined(CONFIG_ARCH_CHIP_ESP32H2) || defined(CONFIG_ARCH_CHIP_ESP32C6)
 #  include "soc/pcr_reg.h"
+#endif
+#ifdef CONFIG_PM
+#  include "include/esp_pm.h"
 #endif
 
 /****************************************************************************
@@ -138,6 +141,9 @@ struct esp_i2c_priv_s
   uint8_t tx_buffer[I2C_SLAVE_BUFF_SIZE]; /* I2C Slave TX queue buffer */
   uint32_t rx_length;                     /* Location of next RX value */
   uint8_t rx_buffer[I2C_SLAVE_BUFF_SIZE]; /* I2C Slave RX queue buffer */
+#ifdef CONFIG_PM
+  esp_pm_lock_handle_t pm_lock;           /* Power management lock */
+#endif
 };
 
 /****************************************************************************
@@ -225,6 +231,9 @@ static struct esp_i2c_priv_s esp_i2c0_priv =
   {
     0
   },
+#ifdef CONFIG_PM
+  .pm_lock    = NULL,
+#endif
 };
 #endif
 
@@ -274,6 +283,9 @@ static struct esp_i2c_priv_s esp_i2c1_priv =
   {
     0
   },
+#ifdef CONFIG_PM
+  .pm_lock    = NULL,
+#endif
 };
 #endif /* CONFIG_ESPRESSIF_I2C1 */
 
@@ -616,7 +628,7 @@ static void esp_i2c_slave_deinit(struct esp_i2c_priv_s *priv)
  *
  ****************************************************************************/
 #ifndef CONFIG_I2C_POLLED
-static int esp_i2c_slave_irq(int cpuint, void *context, void *arg)
+static int esp_i2c_slave_irq(int irq, void *context, void *arg)
 {
   struct esp_i2c_priv_s *priv = (struct esp_i2c_priv_s *)arg;
   uint32_t irq_status = 0;
@@ -627,8 +639,14 @@ static int esp_i2c_slave_irq(int cpuint, void *context, void *arg)
       return OK;
     }
 
+#ifdef CONFIG_PM
+  esp_pm_lock_acquire(priv->pm_lock);
+#endif
   esp_i2c_process(priv , irq_status);
   i2c_ll_clear_intr_mask(priv->ctx->dev, irq_status);
+#ifdef CONFIG_PM
+  esp_pm_lock_release(priv->pm_lock);
+#endif
   return OK;
 }
 #endif
@@ -661,7 +679,7 @@ static int esp_i2c_slave_polling_waitdone(struct esp_i2c_priv_s *priv)
   current = clock_systime_ticks();
   timeout = current + SEC2TICK(I2C_SLAVE_POLL_RATE);
 
-  while ((sclock_t)(current - timeout) < 0)
+  while (current - timeout < 0)
     {
       /* Check if any interrupt triggered, clear them
        * process the operation.
@@ -721,7 +739,13 @@ static int esp_i2c_slave_thread(int argc, char **argv)
   nxsched_usleep(1000);
   while (true)
     {
+#ifdef CONFIG_PM
+      esp_pm_lock_acquire(priv->pm_lock);
+#endif
       esp_i2c_slave_polling_waitdone(priv);
+#ifdef CONFIG_PM
+      esp_pm_lock_release(priv->pm_lock);
+#endif
 
       /* Sleeping thread before checking i2c peripheral */
 
@@ -833,6 +857,9 @@ struct i2c_slave_s *esp_i2cbus_slave_initialize(int port, int addr)
 {
   struct esp_i2c_priv_s *priv;
   int ret;
+#ifdef CONFIG_PM
+  esp_pm_lock_type_t pm_lock_type = ESP_PM_NO_LIGHT_SLEEP;
+#endif
 
   switch (port)
     {
@@ -862,6 +889,35 @@ struct i2c_slave_s *esp_i2cbus_slave_initialize(int port, int addr)
       return (struct i2c_slave_s *)priv;
     }
 
+#ifdef CONFIG_PM
+#  if SOC_I2C_SUPPORT_RTC
+  if (I2C_CLK_SRC_DEFAULT == I2C_CLK_SRC_RC_FAST)
+    {
+      pm_lock_type = ESP_PM_NO_LIGHT_SLEEP;
+    }
+#  endif
+
+#  if SOC_I2C_SUPPORT_APB
+  if (I2C_CLK_SRC_DEFAULT == I2C_CLK_SRC_APB)
+    {
+      pm_lock_type = ESP_PM_APB_FREQ_MAX;
+    }
+#  endif
+
+  ret = esp_pm_lock_create(pm_lock_type,
+                           0,
+                           i2c_periph_signal[priv->id].module_name,
+                           &priv->pm_lock);
+  if (ret != OK)
+    {
+      priv->refs--;
+      nxmutex_unlock(&priv->lock);
+      i2cerr("Failed to create I2C PM lock."
+             "Handler: %p\n", priv);
+      return NULL;
+    }
+#endif
+
 #ifndef CONFIG_I2C_POLLED
   if (priv->cpuint != -ENOMEM)
     {
@@ -873,25 +929,13 @@ struct i2c_slave_s *esp_i2cbus_slave_initialize(int port, int addr)
 
   priv->cpuint = esp_setup_irq(i2c_periph_signal[priv->id].irq,
                                ESP_IRQ_PRIORITY_DEFAULT,
-                               ESP_IRQ_TRIGGER_LEVEL);
+                               ESP_IRQ_TRIGGER_LEVEL,
+                               esp_i2c_slave_irq,
+                               priv);
   if (priv->cpuint < 0)
     {
       /* Failed to allocate a CPU interrupt of this type. */
 
-      priv->refs--;
-      nxmutex_unlock(&priv->lock);
-
-      return NULL;
-    }
-
-  ret = irq_attach(ESP_SOURCE2IRQ(i2c_periph_signal[priv->id].irq),
-                   esp_i2c_slave_irq, priv);
-  if (ret != OK)
-    {
-      /* Failed to attach IRQ, free the allocated CPU interrupt */
-
-      esp_teardown_irq(i2c_periph_signal[priv->id].irq, priv->cpuint);
-      priv->cpuint = -ENOMEM;
       priv->refs--;
       nxmutex_unlock(&priv->lock);
 
@@ -967,6 +1011,14 @@ int esp_i2cbus_slave_uninitialize(struct i2c_slave_s *dev)
       nxmutex_unlock(&priv->lock);
       return OK;
     }
+
+#ifdef CONFIG_PM
+  if (priv->pm_lock != NULL)
+    {
+      esp_pm_lock_delete(priv->pm_lock);
+      priv->pm_lock = NULL;
+    }
+#endif
 
 #ifndef CONFIG_I2C_POLLED
   up_disable_irq(ESP_SOURCE2IRQ(i2c_periph_signal[priv->id].irq));

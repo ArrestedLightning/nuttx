@@ -26,7 +26,7 @@
 
 #include <nuttx/config.h>
 
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -40,7 +40,7 @@
 
 #include "xtensa.h"
 #include "espressif/esp_efuse.h"
-#include "esp32s3_gpio.h"
+#include "espressif/esp_gpio.h"
 #ifdef CONFIG_LAN9250_SPI
 #include "esp32s3_spi.h"
 #else
@@ -109,9 +109,8 @@ static int lan9250_attach(const struct lan9250_lower_s *lower,
                           xcpt_t handler, void *arg)
 {
   int ret;
-  int irq = ESP32S3_PIN2IRQ(LAN9250_IRQ);
 
-  ret = irq_attach(irq, handler, arg);
+  ret = esp_gpio_irq(LAN9250_IRQ, handler, arg);
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: irq_attach() failed: %d\n", ret);
@@ -139,11 +138,7 @@ static int lan9250_attach(const struct lan9250_lower_s *lower,
 
 static void lan9250_enable(const struct lan9250_lower_s *lower)
 {
-  int irq = ESP32S3_PIN2IRQ(LAN9250_IRQ);
-
-  /* Configure the interrupt for rising and falling edges */
-
-  esp32s3_gpioirqenable(irq, ONLOW);
+  esp_gpioirqenable(LAN9250_IRQ);
   ninfo("Enable the interrupt\n");
 }
 
@@ -163,10 +158,8 @@ static void lan9250_enable(const struct lan9250_lower_s *lower)
 
 static void lan9250_disable(const struct lan9250_lower_s *lower)
 {
-  int irq = ESP32S3_PIN2IRQ(LAN9250_IRQ);
-
   ninfo("Disable the interrupt\n");
-  esp32s3_gpioirqdisable(irq);
+  esp_gpioirqdisable(LAN9250_IRQ);
 }
 
 /****************************************************************************
@@ -188,8 +181,8 @@ static int lan9250_getmac(const struct lan9250_lower_s *lower, uint8_t *mac)
 {
   int fd;
   int ret;
-#ifndef CONFIG_ESP32S3_UNIVERSAL_MAC_ADDRESSES_FOUR
   int i;
+#ifndef CONFIG_ESP32S3_UNIVERSAL_MAC_ADDRESSES_FOUR
   uint8_t tmp;
 #endif
 
@@ -226,6 +219,11 @@ static int lan9250_getmac(const struct lan9250_lower_s *lower, uint8_t *mac)
     }
 
   close(fd);
+
+  for (i = 0; i < 6; i++)
+    {
+      mac[i] = mac[5 - i];
+    }
 
 #ifdef CONFIG_ESP32S3_UNIVERSAL_MAC_ADDRESSES_FOUR
   mac[5] += 3;
@@ -278,8 +276,11 @@ int esp32s3_lan9250_initialize(int port)
 {
   int ret;
 
-  esp32s3_configgpio(LAN9250_IRQ, INPUT_FUNCTION_2 | PULLUP);
-  esp32s3_configgpio(LAN9250_RST, OUTPUT_FUNCTION_2 | PULLUP);
+  /* Configure the interrupt for rising and falling edges */
+
+  esp_configgpio(LAN9250_IRQ, INPUT_FUNCTION_2 | PULLUP | ONLOW);
+
+  esp_configgpio(LAN9250_RST, OUTPUT_FUNCTION_2 | PULLUP);
 
 #ifdef CONFIG_LAN9250_SPI
   g_dev = esp32s3_spibus_initialize(port);
@@ -326,10 +327,8 @@ int esp32s3_lan9250_initialize(int port)
 int esp32s3_lan9250_uninitialize(int port)
 {
   int ret;
-  int irq;
 
-  irq = ESP32S3_PIN2IRQ(LAN9250_IRQ);
-  esp32s3_gpioirqdisable(irq);
+  esp_gpioirqdisable(LAN9250_IRQ);
 
 #ifdef CONFIG_LAN9250_SPI
   ret = esp32s3_spibus_uninitialize((struct spi_dev_s *)g_dev);

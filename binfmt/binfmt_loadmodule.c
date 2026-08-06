@@ -27,7 +27,7 @@
 #include <nuttx/config.h>
 
 #include <sched.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 
 #include <nuttx/lib/lib.h>
@@ -132,6 +132,14 @@ static int load_absmodule(FAR struct binary_s *bin, FAR const char *filename,
 
           bin->unload = binfmt->unload;
           binfmt_dumpmodule(bin);
+          break;
+        }
+      else if (ret == -EACCES)
+        {
+          /* Access explicitly denied -- stop here; do not let a fallback
+           * loader bypass the execute-permission check that already ran.
+           */
+
           break;
         }
     }

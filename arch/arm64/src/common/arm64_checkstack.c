@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include <sched.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
@@ -87,8 +87,8 @@ size_t arm64_stack_check(void *stackbase, size_t nbytes)
 
   /* Take extra care that we do not check outside the stack boundaries */
 
-  start = STACK_ALIGN_UP((uintptr_t)stackbase);
-  end   = STACK_ALIGN_DOWN((uintptr_t)stackbase + nbytes);
+  start = STACKFRAME_ALIGN_UP((uintptr_t)stackbase);
+  end   = STACKFRAME_ALIGN_DOWN((uintptr_t)stackbase + nbytes);
 
   /* Get the adjusted size based on the top and bottom of the stack */
 
@@ -101,7 +101,7 @@ size_t arm64_stack_check(void *stackbase, size_t nbytes)
    */
 
   for (ptr = (uint32_t *)start, mark = (nbytes >> 2);
-       *ptr == STACK_COLOR && mark > 0;
+       mark > 0 && *ptr == STACK_COLOR;
        ptr++, mark--);
 
   /* If the stack is completely used, then this might mean that the stack
@@ -166,7 +166,7 @@ void arm64_stack_color(void *stackbase, size_t nbytes)
 
   /* Take extra care that we do not write outside the stack boundaries */
 
-  start = (uintptr_t)STACK_ALIGN_UP((uintptr_t)stackbase);
+  start = (uintptr_t)STACKFRAME_ALIGN_UP((uintptr_t)stackbase);
 
   if (nbytes == 0) /* 0: colorize the running stack */
     {
@@ -240,7 +240,7 @@ size_t up_check_intstack(int cpu, size_t check_size)
 {
   if (check_size == 0)
     {
-      check_size = STACK_ALIGN_DOWN(CONFIG_ARCH_INTERRUPTSTACK);
+      check_size = STACKFRAME_ALIGN_DOWN(CONFIG_ARCH_INTERRUPTSTACK);
     }
 
   return arm64_stack_check((void *)up_get_intstackbase(cpu), check_size);

@@ -32,7 +32,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/arch.h>
 #include <nuttx/irq.h>
@@ -53,22 +53,25 @@
 #include "soc/gpio_sig_map.h"
 #include "periph_ctrl.h"
 #include "soc/soc_caps.h"
-#include "soc/pcnt_periph.h"
+#include "hal/pcnt_periph.h"
 #include "soc/pcnt_reg.h"
 #include "soc/pcnt_struct.h"
 #include "soc/gpio_pins.h"
 #include "esp_clk.h"
 #include "esp_irq.h"
 #include "esp_attr.h"
+#ifdef CONFIG_PM
+#  include "include/esp_pm.h"
+#endif
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define PCNT_UNIT_COUNT                             SOC_PCNT_GROUPS * SOC_PCNT_UNITS_PER_GROUP
-#define GET_UNIT_ID_FROM_RET_CHAN(chan_id)          (int)(chan_id/SOC_PCNT_CHANNELS_PER_UNIT)
-#define GET_CHAN_ID_FROM_RET_CHAN(unit_id, chan_id) (chan_id - (SOC_PCNT_CHANNELS_PER_UNIT * unit_id))
-#define CREATE_RET_CHAN_ID(unit_id, chan_id)        ((SOC_PCNT_CHANNELS_PER_UNIT * unit_id) + chan_id)
+#define PCNT_UNIT_COUNT                             PCNT_LL_GET(INST_NUM) * PCNT_LL_GET(UNITS_PER_INST)
+#define GET_UNIT_ID_FROM_RET_CHAN(chan_id)          (int)(chan_id / PCNT_LL_GET(CHANS_PER_UNIT))
+#define GET_CHAN_ID_FROM_RET_CHAN(unit_id, chan_id) (chan_id - (PCNT_LL_GET(CHANS_PER_UNIT) * unit_id))
+#define CREATE_RET_CHAN_ID(unit_id, chan_id)        ((PCNT_LL_GET(CHANS_PER_UNIT) * unit_id) + chan_id)
 
 #if !SOC_RCC_IS_INDEPENDENT
 #  define PCNT_RCC_ATOMIC() PERIPH_RCC_ATOMIC()
@@ -115,8 +118,11 @@ struct esp_pcnt_priv_s
   spinlock_t lock;                                                      /* Device specific lock. */
   int (*cb)(int, void *, void *);                                       /* User defined callback */
   uint32_t accum_value;                                                 /* Accumulator value of overflowed PCNT unit */
-  bool channels[SOC_PCNT_CHANNELS_PER_UNIT];                            /* Channel information of PCNT unit */
+  bool channels[PCNT_LL_GET(CHANS_PER_UNIT)];                           /* Channel information of PCNT unit */
   struct esp_pcnt_watch_point_priv_s watchers[PCNT_LL_WATCH_EVENT_MAX]; /* array of PCNT watchers */
+#ifdef CONFIG_PM
+  esp_pm_lock_handle_t pm_lock;                                         /* Power management lock */
+#endif
 };
 
 /****************************************************************************
@@ -125,10 +131,8 @@ struct esp_pcnt_priv_s
 
 static int esp_pcnt_open(struct cap_lowerhalf_s *dev);
 static int esp_pcnt_close(struct cap_lowerhalf_s *dev);
-static int IRAM_ATTR esp_pcnt_isr_default(int irq, void *context,
-                                          void *arg);
-static int esp_pcnt_isr_register(int (*fn)(int, void *, void *),
-                                 int intr_alloc_flags);
+static int IRAM_ATTR esp_pcnt_isr_default(int irq, void *context, void *arg);
+static int esp_pcnt_isr_register(int (*fn)(int, void *, void *), void *arg);
 static int esp_pcnt_ioctl(struct cap_lowerhalf_s *dev, int cmd,
                           unsigned long arg);
 static int esp_pcnt_unit_enable(struct cap_lowerhalf_s *dev);
@@ -166,7 +170,7 @@ static pcnt_hal_context_t ctx;                     /* Struct of the common layer
 static mutex_t g_pcnt_mutex = NXMUTEX_INITIALIZER; /* Mutual exclusion m:utex */
 static bool g_pcnt_intr = false;                   /* ISR register flag for peripheral */
 static spinlock_t g_pcnt_lock = SP_UNLOCKED;       /* PCNT unit lock */
-static int g_pcnt_refs[SOC_PCNT_GROUPS] =          /* Reference count */
+static int g_pcnt_refs[PCNT_LL_GET(INST_NUM)] =    /* Reference count */
   {
     0
   };
@@ -378,8 +382,7 @@ static int esp_pcnt_ioctl(struct cap_lowerhalf_s *dev, int cmd,
  *
  ****************************************************************************/
 
-static int IRAM_ATTR esp_pcnt_isr_default(int irq, void *context,
-                                          void *arg)
+static int IRAM_ATTR esp_pcnt_isr_default(int irq, void *context, void *arg)
 {
   struct esp_pcnt_priv_s *unit;
   int unit_id = 0;
@@ -388,13 +391,13 @@ static int IRAM_ATTR esp_pcnt_isr_default(int irq, void *context,
   struct esp_pcnt_watch_event_data_s data;
   irqstate_t flags;
 
-  for (unit_id = 0; unit_id < SOC_PCNT_UNITS_PER_GROUP; unit_id++)
+  for (unit_id = 0; unit_id < PCNT_LL_GET(UNITS_PER_INST); unit_id++)
     {
       if (intr_status & PCNT_LL_UNIT_WATCH_EVENT(unit_id))
         break;
     }
 
-  if (unit_id < SOC_PCNT_UNITS_PER_GROUP)
+  if (unit_id < PCNT_LL_GET(UNITS_PER_INST))
     {
       unit = &pcnt_units[unit_id];
       pcnt_ll_clear_intr_status(ctx.dev, PCNT_LL_UNIT_WATCH_EVENT(unit_id));
@@ -444,7 +447,7 @@ static int IRAM_ATTR esp_pcnt_isr_default(int irq, void *context,
  *
  * Input Parameters:
  *   fn               - Pointer to the ISR function.
- *   intr_alloc_flags - Flags for the interrupt allocation.
+ *   arg              - Pointer to the argument to be passed to the ISR.
  *
  * Returned Value:
  *   Returns OK on successful registration of the ISR; a negated errno value
@@ -452,8 +455,7 @@ static int IRAM_ATTR esp_pcnt_isr_default(int irq, void *context,
  *
  ****************************************************************************/
 
-static int esp_pcnt_isr_register(int (*fn)(int, void *, void *),
-                                 int intr_alloc_flags)
+static int esp_pcnt_isr_register(int (*fn)(int, void *, void *), void *arg)
 {
   int cpuint;
   int ret;
@@ -461,26 +463,18 @@ static int esp_pcnt_isr_register(int (*fn)(int, void *, void *),
 
   DEBUGASSERT(fn);
 
-  cpuint = esp_setup_irq(pcnt_periph_signals.groups[0].irq,
+  cpuint = esp_setup_irq(soc_pcnt_signals[0].irq_id,
                          ESP_IRQ_PRIORITY_DEFAULT,
-                         ESP_IRQ_TRIGGER_LEVEL);
+                         ESP_IRQ_TRIGGER_LEVEL,
+                         fn,
+                         arg);
   if (cpuint < 0)
     {
       cperr("Failed to allocate a CPU interrupt.\n");
       return ERROR;
     }
 
-  ret = irq_attach(ESP_SOURCE2IRQ(pcnt_periph_signals.groups[0].irq),
-                   fn,
-                   0);
-  if (ret < 0)
-    {
-      cperr("Couldn't attach IRQ to handler.\n");
-      esp_teardown_irq(pcnt_periph_signals.groups[0].irq, cpuint);
-      return ERROR;
-    }
-
-  up_enable_irq(ESP_SOURCE2IRQ(pcnt_periph_signals.groups[0].irq));
+  up_enable_irq(ESP_SOURCE2IRQ(soc_pcnt_signals[0].irq_id));
   return OK;
 }
 
@@ -519,6 +513,10 @@ static int esp_pcnt_unit_enable(struct cap_lowerhalf_s *dev)
       pcnt_ll_enable_intr(ctx.dev, PCNT_LL_UNIT_WATCH_EVENT(priv->unit_id),
                           true);
     }
+
+#ifdef CONFIG_PM
+  esp_pm_lock_acquire(priv->pm_lock);
+#endif
 
   priv->state = PCNT_UNIT_ENABLE;
   return OK;
@@ -559,6 +557,10 @@ static int esp_pcnt_unit_disable(struct cap_lowerhalf_s *dev)
       pcnt_ll_enable_intr(ctx.dev, PCNT_LL_UNIT_WATCH_EVENT(priv->unit_id),
                           false);
     }
+
+#ifdef CONFIG_PM
+  esp_pm_lock_release(priv->pm_lock);
+#endif
 
   priv->state = PCNT_UNIT_INIT;
   return OK;
@@ -830,6 +832,9 @@ struct cap_lowerhalf_s *esp_pcnt_new_unit(
   int ret;
   int i;
   irqstate_t flags;
+#ifdef CONFIG_PM
+  esp_pm_lock_type_t pm_lock_type = ESP_PM_NO_LIGHT_SLEEP;
+#endif
 
   if (config == NULL)
     {
@@ -858,7 +863,7 @@ struct cap_lowerhalf_s *esp_pcnt_new_unit(
       if (!pcnt_units[unit_id].unit_used)
         {
           pcnt_units[unit_id].unit_used = true;
-          group_id = unit_id / SOC_PCNT_UNITS_PER_GROUP;
+          group_id = unit_id / PCNT_LL_GET(UNITS_PER_INST);
           pcnt_units[unit_id].group_id = group_id;
           break;
         }
@@ -886,10 +891,29 @@ struct cap_lowerhalf_s *esp_pcnt_new_unit(
   spin_unlock_irqrestore(&g_pcnt_lock, flags);
   cpinfo("Allocated pcnt unit: %" PRId16 "\n", unit_id);
 
+#ifdef CONFIG_PM
+#  if PCNT_LL_CLOCK_SUPPORT_APB
+  if (PCNT_CLK_SRC_DEFAULT == PCNT_CLK_SRC_APB)
+    {
+      pm_lock_type = ESP_PM_APB_FREQ_MAX;
+    }
+
+#  endif
+  ret = esp_pm_lock_create(pm_lock_type,
+                           0,
+                           soc_pcnt_signals[unit_id].module_name,
+                           &pcnt_units[unit_id].pm_lock);
+  if (ret != OK)
+    {
+      cperr("Failed to create PCNT PM lock\n");
+      return NULL;
+    }
+#endif
+
   if (!g_pcnt_intr)
     {
       nxmutex_lock(&g_pcnt_mutex);
-      ret = esp_pcnt_isr_register(esp_pcnt_isr_default, 0);
+      ret = esp_pcnt_isr_register(esp_pcnt_isr_default, NULL);
       if (ret < 0)
         {
           pcnt_units[unit_id].unit_used = false;
@@ -967,7 +991,7 @@ int esp_pcnt_del_unit(struct cap_lowerhalf_s *dev)
       return ERROR;
     }
 
-  for (i = 0; i < SOC_PCNT_CHANNELS_PER_UNIT; i++)
+  for (i = 0; i < PCNT_LL_GET(CHANS_PER_UNIT); i++)
     {
       if (!priv->channels[i])
         {
@@ -996,8 +1020,13 @@ int esp_pcnt_del_unit(struct cap_lowerhalf_s *dev)
           pcnt_ll_enable_bus_clock(priv->group_id, false);
         }
 
-      esp_teardown_irq(pcnt_periph_signals.groups[0].irq, -ENOMEM);
+      esp_teardown_irq(soc_pcnt_signals[0].irq_id, -ENOMEM);
     }
+
+#ifdef CONFIG_PM
+  esp_pm_lock_delete(priv->pm_lock);
+  priv->pm_lock = NULL;
+#endif
 
   spin_unlock_irqrestore(&priv->lock, flags);
 
@@ -1106,7 +1135,7 @@ int esp_pcnt_unit_add_watch_point(struct cap_lowerhalf_s *dev,
 
   else
     {
-      int thres_num = SOC_PCNT_THRES_POINT_PER_UNIT - 1;
+      int thres_num = PCNT_LL_GET(THRES_POINT_PER_UNIT) - 1;
       switch (thres_num)
         {
           case 1:
@@ -1261,7 +1290,6 @@ int esp_pcnt_new_channel(struct cap_lowerhalf_s *dev,
   int gpio_mode;
   int virt_gpio;
   int ret_id = 0;
-  const pcnt_signal_conn_t *chan;
 
   if (!config)
     {
@@ -1281,7 +1309,7 @@ int esp_pcnt_new_channel(struct cap_lowerhalf_s *dev,
       return ERROR;
     }
 
-  for (int i = 0; i < SOC_PCNT_CHANNELS_PER_UNIT; i++)
+  for (int i = 0; i < PCNT_LL_GET(CHANS_PER_UNIT); i++)
     {
       if (!priv->channels[i])
         {
@@ -1300,13 +1328,13 @@ int esp_pcnt_new_channel(struct cap_lowerhalf_s *dev,
       (config->flags && ESP_PCNT_CHAN_IO_LOOPBACK ? OUTPUT_FUNCTION : 0);
   virt_gpio = (config->flags && ESP_PCNT_CHAN_VIRT_LVL_IO_LVL) ?
       GPIO_MATRIX_CONST_ONE_INPUT : GPIO_MATRIX_CONST_ZERO_INPUT;
-  chan = &pcnt_periph_signals;
 
   if (config->edge_gpio_num >= 0)
     {
       esp_configgpio(config->edge_gpio_num, gpio_mode);
       esp_gpio_matrix_in(config->edge_gpio_num,
-        chan->groups[0].units[unit_id].channels[channel_id].pulse_sig,
+        soc_pcnt_signals[0].units[unit_id].channels[channel_id].\
+        pulse_sig_id_matrix,
         (config->flags && ESP_PCNT_CHAN_INVERT_EDGE_IN));
     }
   else
@@ -1314,7 +1342,8 @@ int esp_pcnt_new_channel(struct cap_lowerhalf_s *dev,
       /* using virtual IO */
 
       esp_gpio_matrix_in(virt_gpio,
-        chan->groups[0].units[unit_id].channels[channel_id].pulse_sig,
+        soc_pcnt_signals[0].units[unit_id].channels[channel_id].\
+        pulse_sig_id_matrix,
         (config->flags && ESP_PCNT_CHAN_INVERT_EDGE_IN));
     }
 
@@ -1322,7 +1351,8 @@ int esp_pcnt_new_channel(struct cap_lowerhalf_s *dev,
     {
       esp_configgpio(config->level_gpio_num, gpio_mode);
       esp_gpio_matrix_in(config->level_gpio_num,
-        chan->groups[0].units[unit_id].channels[channel_id].control_sig,
+        soc_pcnt_signals[0].units[unit_id].channels[channel_id].\
+        ctl_sig_id_matrix,
         (config->flags && ESP_PCNT_CHAN_INVERT_LVL_IN));
     }
   else
@@ -1330,7 +1360,8 @@ int esp_pcnt_new_channel(struct cap_lowerhalf_s *dev,
       /* using virtual IO */
 
       esp_gpio_matrix_in(virt_gpio,
-        chan->groups[0].units[unit_id].channels[channel_id].control_sig,
+        soc_pcnt_signals[0].units[unit_id].channels[channel_id].\
+        ctl_sig_id_matrix,
         (config->flags && ESP_PCNT_CHAN_INVERT_LVL_IN));
     }
 

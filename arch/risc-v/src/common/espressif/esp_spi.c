@@ -29,7 +29,7 @@
 #ifdef CONFIG_ESPRESSIF_SPI_PERIPH
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <inttypes.h>
@@ -51,10 +51,6 @@
 #include "esp_irq.h"
 #include "esp_gpio.h"
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
-#include "esp_dma.h"
-#endif
-
 #include "riscv_internal.h"
 
 #include "esp_cache.h"
@@ -68,12 +64,21 @@
 #include "hal/hal_utils.h"
 #include "periph_ctrl.h"
 #include "esp_private/spi_share_hw_ctrl.h"
-#include "soc/gdma_periph.h"
+#include "hal/gdma_periph.h"
 #include "hal/gdma_ll.h"
+#include "hal/dma_types.h"
 #include "esp_memory_utils.h"
 
 #if SOC_GDMA_SUPPORTED
 #  include "esp_private/gdma.h"
+#endif
+
+#ifdef CONFIG_PM
+#  include "include/esp_pm.h"
+#endif
+
+#ifdef CONFIG_ESPRESSIF_LPSPI0
+#  include "lp_core_spi.h"
 #endif
 
 /****************************************************************************
@@ -88,7 +93,7 @@
 #  define MISO_PIN_ATTR (INPUT_FUNCTION_2 | PULLUP)
 #endif
 
-#if defined(CONFIG_ARCH_CHIP_ESP32C3_GENERIC)
+#if defined(CONFIG_ARCH_CHIP_ESP32C3)
 #define SPI2_IOMUX_MISOPIN  2
 #define SPI2_IOMUX_MOSIPIN  7
 #define SPI2_IOMUX_CLKPIN   6
@@ -113,7 +118,7 @@
 #  define SPI_HAVE_SWCS 0
 #endif
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
 
 /* SPI DMA RX/TX number of descriptors */
 
@@ -185,6 +190,10 @@ typedef dma_descriptor_align4_t spi_dma_desc_t;
 #define spi_dma_start(chan, addr)   gdma_start(chan, (intptr_t)(addr))
 #endif
 
+/* peripheral hardware limitation for clock source into peripheral */
+
+#define SPI_PERIPH_SRC_FREQ_MAX     (80*1000*1000)
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -211,25 +220,36 @@ struct esp_spi_priv_s
   const struct esp_spi_config_s *config;
   int refs;                             /* Reference count */
   mutex_t lock;                         /* Held while chip is selected for mutual exclusion */
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
   sem_t sem_isr;                        /* Interrupt wait semaphore */
   int cpuint;                           /* SPI interrupt ID */
-  gdma_channel_handle_t dma_channel_tx; /* I2S DMA TX channel being used */
-  gdma_channel_handle_t dma_channel_rx; /* I2S DMA RX channel being used */
+  gdma_channel_handle_t dma_channel_tx; /* SPI DMA TX channel being used */
+  gdma_channel_handle_t dma_channel_rx; /* SPI DMA RX channel being used */
   int32_t dma_channel;                  /* Channel assigned by the GDMA driver */
+  spi_dma_desc_t *dma_rxdesc;           /* DMA RX description */
+  spi_dma_desc_t *dma_txdesc;           /* DMA TX description */
+  int dma_thld;                         /* DMA threshold value */
 #endif
   uint8_t nbits;                        /* Actual SPI send/receive bits once transmission */
   uint8_t id;                           /* ID number of SPI interface */
   spi_hal_context_t *ctx;               /* Context struct of common layer */
   spi_hal_dev_config_t *dev_cfg;        /* Device configuration struct of common layer */
   spi_hal_timing_param_t *timing_param; /* Timing struct of common layer */
+#ifdef CONFIG_PM
+  esp_pm_lock_handle_t pm_lock;         /* Power management lock */
+#endif
 };
 
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if SPI_LL_SUPPORT_CLK_SRC_PRE_DIV
+static uint32_t spi_find_clock_src_pre_div(uint32_t src_freq,
+                                           uint32_t target_freq);
+#endif //SPI_LL_SUPPORT_CLK_SRC_PRE_DIV
+
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
 static uint32_t spi_common_dma_setup(int chan, bool tx,
                                      spi_dma_desc_t *dmadesc, uint32_t num,
                                      uint8_t *pbuf, uint32_t len);
@@ -252,7 +272,7 @@ static uint32_t esp_spi_send(struct spi_dev_s *dev, uint32_t wd);
 static void esp_spi_exchange(struct spi_dev_s *dev,
                              const void *txbuffer,
                              void *rxbuffer, size_t nwords);
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
 static int esp_spi_interrupt(int irq, void *context, void *arg);
 static int esp_spi_sem_waitdone(struct esp_spi_priv_s *priv);
 static void esp_spi_dma_exchange(struct esp_spi_priv_s *priv,
@@ -276,7 +296,7 @@ static void esp_spi_recvblock(struct spi_dev_s *dev,
 #ifdef CONFIG_SPI_TRIGGER
 static int esp_spi_trigger(struct spi_dev_s *dev);
 #endif
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
 static void esp_spi_dma_init(struct spi_dev_s *dev);
 #endif
 static void esp_spi_init(struct spi_dev_s *dev);
@@ -287,6 +307,15 @@ static void esp_spi_deinit(struct spi_dev_s *dev);
  ****************************************************************************/
 
 #ifdef CONFIG_ESPRESSIF_SPI2
+
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
+
+/* SPI DMA RX/TX description */
+
+static spi_dma_desc_t dma_rxdesc[CONFIG_ESPRESSIF_SPI2_DMADESC_NUM];
+static spi_dma_desc_t dma_txdesc[CONFIG_ESPRESSIF_SPI2_DMADESC_NUM];
+
+#endif
 
 static spi_hal_context_t ctx =
 {
@@ -377,19 +406,165 @@ static struct esp_spi_priv_s esp_spi2_priv =
   .dev_cfg      = &dev_cfg,
   .ctx          = &ctx,
   .timing_param = &timing_param,
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
   .sem_isr      = SEM_INITIALIZER(0),
   .cpuint       = -ENOMEM,
+  .dma_channel  = CONFIG_ESPRESSIF_SPI2_DMADESC_NUM,
+  .dma_rxdesc   = dma_rxdesc,
+  .dma_txdesc   = dma_txdesc,
+  .dma_thld     = CONFIG_ESPRESSIF_SPI2_DMATHRESHOLD,
+#endif
+#ifdef CONFIG_PM
+  .pm_lock      = NULL,
 #endif
 };
 #endif /* CONFIG_ESPRESSIF_SPI2 */
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#ifdef CONFIG_ESPRESSIF_SPI3
+
+#ifdef CONFIG_ESPRESSIF_SPI3_DMA
 
 /* SPI DMA RX/TX description */
 
-static spi_dma_desc_t dma_rxdesc[SPI_DMA_DESC_NUM];
-static spi_dma_desc_t dma_txdesc[SPI_DMA_DESC_NUM];
+static spi_dma_desc_t spi3_dma_rxdesc[CONFIG_ESPRESSIF_SPI3_DMADESC_NUM];
+static spi_dma_desc_t spi3_dma_txdesc[CONFIG_ESPRESSIF_SPI3_DMADESC_NUM];
+
+#endif
+
+static spi_hal_context_t spi3_ctx =
+{
+    0
+};
+
+static spi_hal_dev_config_t spi3_dev_cfg  =
+{
+    .mode = SPI_DEFAULT_MODE,
+    .cs_setup = 0,
+    .cs_hold = 0,
+    .cs_pin_id = 0,
+    .timing_conf =
+    {
+      0
+    },
+    {
+      0
+    }
+};
+
+static spi_hal_timing_param_t spi3_timing_param =
+{
+    .no_compensate = 0,
+    .half_duplex = 0,
+    .input_delay_ns = 0,
+    .use_gpio = 1,
+    .duty_cycle = 128,
+    .clk_src_hz = 0,
+    .expected_freq = SPI_DEFAULT_FREQ,
+};
+
+static const struct esp_spi_config_s esp_spi3_config =
+{
+  .width        = SPI_DEFAULT_WIDTH,
+  .cs_pin       = CONFIG_ESPRESSIF_SPI3_CSPIN,
+  .mosi_pin     = CONFIG_ESPRESSIF_SPI3_MOSIPIN,
+  .miso_pin     = CONFIG_ESPRESSIF_SPI3_MISOPIN,
+  .clk_pin      = CONFIG_ESPRESSIF_SPI3_CLKPIN,
+};
+
+static const struct spi_ops_s esp_spi3_ops =
+{
+  .lock              = esp_spi_lock,
+#ifdef CONFIG_ESPRESSIF_SPI_UDCS
+  .select            = esp_spi3_select,
+#else
+  .select            = esp_spi_select,
+#endif
+  .setfrequency      = esp_spi_setfrequency,
+  .setmode           = esp_spi_setmode,
+  .setbits           = esp_spi_setbits,
+#ifdef CONFIG_SPI_HWFEATURES
+  .hwfeatures        = esp_spi_hwfeatures,
+#endif
+  .status            = esp_spi3_status,
+#ifdef CONFIG_SPI_CMDDATA
+  .cmddata           = esp_spi3_cmddata,
+#endif
+  .send              = esp_spi_send,
+#ifdef CONFIG_SPI_EXCHANGE
+  .exchange          = esp_spi_exchange,
+#else
+  .sndblock          = esp_spi_sndblock,
+  .recvblock         = esp_spi_recvblock,
+#endif
+#ifdef CONFIG_SPI_TRIGGER
+  .trigger           = esp_spi_trigger,
+#endif
+  .registercallback  = NULL,
+};
+
+static struct esp_spi_priv_s esp_spi3_priv =
+{
+  .spi_dev      =
+  {
+    .ops        = &esp_spi3_ops
+  },
+  .config       = &esp_spi3_config,
+  .refs         = 0,
+  .lock         = NXMUTEX_INITIALIZER,
+  .id           = SPI3_HOST,
+  .nbits        = 0,
+  .dev_cfg      = &spi3_dev_cfg,
+  .ctx          = &spi3_ctx,
+  .timing_param = &spi3_timing_param,
+#ifdef CONFIG_ESPRESSIF_SPI3_DMA
+  .sem_isr      = SEM_INITIALIZER(0),
+  .cpuint       = -ENOMEM,
+  .dma_channel  = CONFIG_ESPRESSIF_SPI3_DMADESC_NUM,
+  .dma_rxdesc   = spi3_dma_rxdesc,
+  .dma_txdesc   = spi3_dma_txdesc,
+  .dma_thld     = CONFIG_ESPRESSIF_SPI3_DMATHRESHOLD,
+#endif
+#ifdef CONFIG_PM
+  .pm_lock      = NULL,
+#endif
+};
+#endif /* CONFIG_ESPRESSIF_SPI3 */
+
+#ifdef CONFIG_ESPRESSIF_LPSPI0
+static const struct esp_spi_config_s esp_lpspi_config =
+{
+  .width        = SPI_DEFAULT_WIDTH,
+  .cs_pin       = CONFIG_ESPRESSIF_LPSPI0_CSPIN,
+  .mosi_pin     = CONFIG_ESPRESSIF_LPSPI0_MOSIPIN,
+  .miso_pin     = CONFIG_ESPRESSIF_LPSPI0_MISOPIN,
+  .clk_pin      = CONFIG_ESPRESSIF_LPSPI0_CLKPIN,
+};
+
+static struct esp_spi_priv_s esp_lpspi_priv =
+{
+  .spi_dev      =
+  {
+    .ops        = NULL
+  },
+  .config       = &esp_lpspi_config,
+  .refs         = 0,
+  .lock         = NXMUTEX_INITIALIZER,
+  .id           = 0,
+  .nbits        = 0,
+  .dev_cfg      = NULL,
+  .ctx          = NULL,
+  .timing_param = NULL,
+#ifdef CONFIG_PM
+  .pm_lock      = NULL,
+#endif
+};
+
+static lp_spi_device_config_t esp_lpspi_device_config =
+{
+  .cs_io_num = CONFIG_ESPRESSIF_LPSPI0_CSPIN,
+  .clock_speed_hz = SPI_DEFAULT_FREQ / 4,
+  .duty_cycle = 128,
+};
 
 #endif
 
@@ -400,6 +575,39 @@ static uint32_t blank_arr[SPI_BLANK_ARRAY_SIZE];
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+#if SPI_LL_SUPPORT_CLK_SRC_PRE_DIV
+static uint32_t spi_find_clock_src_pre_div(uint32_t src_freq,
+                                           uint32_t target_freq)
+{
+  /* pre division must be even and at least 2 */
+
+  uint32_t total_div;
+  uint32_t pre_div;
+  uint32_t min_div = ((src_freq / SPI_PERIPH_SRC_FREQ_MAX) + 1) & (~0x01ul);
+
+  min_div = min_div < 2 ? 2 : min_div;
+
+  total_div = src_freq / target_freq;
+
+  /* Loop the `div` to find a divisible value of `total_div` */
+
+  for (pre_div = min_div;
+       pre_div <= MIN(total_div, SPI_LL_SRC_PRE_DIV_MAX);
+       pre_div += 2)
+    {
+      if ((total_div % pre_div) ||
+          (total_div / pre_div) > SPI_LL_PERIPH_CLK_DIV_MAX)
+        {
+          continue;
+        }
+
+      return pre_div;
+    }
+
+  return min_div;
+}
+#endif //SPI_LL_SUPPORT_CLK_SRC_PRE_DIV
 
 /****************************************************************************
  * Name: spi_common_dma_setup
@@ -420,7 +628,7 @@ static uint32_t blank_arr[SPI_BLANK_ARRAY_SIZE];
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
 static uint32_t spi_common_dma_setup(int chan, bool tx,
                                      spi_dma_desc_t *dmadesc, uint32_t num,
                                      uint8_t *pbuf, uint32_t len)
@@ -443,7 +651,7 @@ static uint32_t spi_common_dma_setup(int chan, bool tx,
 
   for (i = 0; i < num; i++)
     {
-      data_len = MIN(bytes, ESPRESSIF_DMA_BUFLEN_MAX);
+      data_len = MIN(bytes, DMA_DESCRIPTOR_BUFFER_MAX_SIZE_4B_ALIGNED);
 
       /* Buffer length must be rounded to next 32-bit boundary. */
 
@@ -531,7 +739,7 @@ static int esp_spi_lock(struct spi_dev_s *dev, bool lock)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
 static int esp_spi_sem_waitdone(struct esp_spi_priv_s *priv)
 {
   return nxsem_tickwait_uninterruptible(&priv->sem_isr, SEC2TICK(10));
@@ -614,24 +822,9 @@ static uint32_t esp_spi_setfrequency(struct spi_dev_s *dev,
     }
 
 #if SPI_LL_SUPPORT_CLK_SRC_PRE_DIV
-  if (clock_source_hz / 2 > (80 * 1000000))
-    {
-      /* clock_source_hz beyond peripheral HW limitation, calc pre-divider */
-
-      hal_utils_clk_info_t clk_cfg =
-        {
-          .src_freq_hz = clock_source_hz,
-          .exp_freq_hz = frequency * 2,  /* we have (hs_clk = 2*mst_clk), calc hs_clk first */
-          .round_opt = HAL_DIV_ROUND,
-          .min_integ = 1,
-          .max_integ = SPI_LL_CLK_SRC_PRE_DIV_MAX / 2,
-        };
-
-      hal_utils_calc_clk_div_integer(&clk_cfg, &clock_source_div);
-    }
-
-  clock_source_div *= 2;                /* convert to mst_clk function divider */
-  clock_source_hz /= clock_source_div;  /* actual freq enter to SPI peripheral */
+  clock_source_div = spi_find_clock_src_pre_div(clock_source_hz,
+                                                SPI_DEFAULT_FREQ);
+  clock_source_hz /= clock_source_div; /* actual freq enter to SPI peripheral */
 #endif
 
   priv->timing_param->clk_src_hz = clock_source_hz;
@@ -781,7 +974,7 @@ static int esp_spi_hwfeatures(struct spi_dev_s *dev,
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
 static void esp_spi_dma_exchange(struct esp_spi_priv_s *priv,
                                      const void *txbuffer,
                                      void *rxbuffer,
@@ -792,7 +985,6 @@ static void esp_spi_dma_exchange(struct esp_spi_priv_s *priv,
   uint32_t rx_byte_len;
   int tx_dma_channel_id;
   int rx_dma_channel_id;
-  spi_dma_dev_t *spi_dma = SPI_LL_GET_HW(SPI2_HOST);
   uint32_t n;
   uint16_t alignment;
   uint32_t bytes = total;
@@ -919,8 +1111,8 @@ static void esp_spi_dma_exchange(struct esp_spi_priv_s *priv,
 
   while (bytes != 0)
     {
-      n = spi_common_dma_setup(tx_dma_channel_id, true, dma_txdesc,
-                               SPI_DMA_DESC_NUM, tp, bytes);
+      n = spi_common_dma_setup(tx_dma_channel_id, true, priv->dma_txdesc,
+                               priv->dma_channel, tp, bytes);
 
       trans.tx_bitlen = n * 8;
       trans.rx_bitlen = n * 8;
@@ -937,7 +1129,7 @@ static void esp_spi_dma_exchange(struct esp_spi_priv_s *priv,
 
       spi_hal_hw_prepare_tx(priv->ctx->hw);
 
-      spi_dma_start(priv->dma_channel_tx, dma_txdesc);
+      spi_dma_start(priv->dma_channel_tx, priv->dma_txdesc);
 
       spi_ll_enable_mosi(priv->ctx->hw, true);
 
@@ -947,14 +1139,14 @@ static void esp_spi_dma_exchange(struct esp_spi_priv_s *priv,
         {
           /* Enable SPI DMA RX */
 
-          spi_common_dma_setup(rx_dma_channel_id, false, dma_rxdesc,
-                               SPI_DMA_DESC_NUM, rp, bytes);
+          spi_common_dma_setup(rx_dma_channel_id, false, priv->dma_rxdesc,
+                               priv->dma_channel, rp, bytes);
 
           spi_dma_reset(priv->dma_channel_rx);
 
           spi_hal_hw_prepare_rx(priv->ctx->hw);
 
-          spi_dma_start(priv->dma_channel_rx, dma_rxdesc);
+          spi_dma_start(priv->dma_channel_rx, priv->dma_rxdesc);
 
           spi_ll_enable_miso(priv->ctx->hw, true);
 
@@ -1062,8 +1254,17 @@ static uint32_t esp_spi_poll_send(struct esp_spi_priv_s *priv, uint32_t wd)
 static uint32_t esp_spi_send(struct spi_dev_s *dev, uint32_t wd)
 {
   struct esp_spi_priv_s *priv = (struct esp_spi_priv_s *)dev;
+  int ret;
 
-  return esp_spi_poll_send(priv, wd);
+#ifdef CONFIG_PM
+  esp_pm_lock_acquire(priv->pm_lock);
+#endif
+  ret = esp_spi_poll_send(priv, wd);
+#ifdef CONFIG_PM
+  esp_pm_lock_release(priv->pm_lock);
+#endif
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1190,8 +1391,11 @@ static void esp_spi_exchange(struct spi_dev_s *dev,
 {
   struct esp_spi_priv_s *priv = (struct esp_spi_priv_s *)dev;
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
-  size_t thld = CONFIG_ESPRESSIF_SPI2_DMATHRESHOLD;
+#ifdef CONFIG_PM
+  esp_pm_lock_acquire(priv->pm_lock);
+#endif
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
+  size_t thld = priv->dma_thld;
 
   if (nwords > thld)
     {
@@ -1202,6 +1406,10 @@ static void esp_spi_exchange(struct spi_dev_s *dev,
     {
       esp_spi_poll_exchange(priv, txbuffer, rxbuffer, nwords);
     }
+
+#ifdef CONFIG_PM
+  esp_pm_lock_release(priv->pm_lock);
+#endif
 }
 
 #ifndef CONFIG_SPI_EXCHANGE
@@ -1302,32 +1510,45 @@ static int esp_spi_trigger(struct spi_dev_s *dev)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
 void esp_spi_dma_init(struct spi_dev_s *dev)
 {
   struct esp_spi_priv_s *priv = (struct esp_spi_priv_s *)dev;
   gdma_channel_alloc_config_t tx_handle =
     {
-      .direction = GDMA_CHANNEL_DIRECTION_TX,
-      .flags.reserve_sibling = 1,
+      0
     };
 
   gdma_channel_alloc_config_t rx_handle =
     {
-      .direction = GDMA_CHANNEL_DIRECTION_RX,
+      0
     };
+
+  gdma_trigger_t periph_trigger;
 
   /* Request a GDMA channel for SPI peripheral */
 
-  SPI_GDMA_NEW_CHANNEL(&tx_handle, &priv->dma_channel_tx);
-  gdma_connect(priv->dma_channel_tx,
-               GDMA_MAKE_TRIGGER(GDMA_TRIG_PERIPH_SPI, 2));
+  if (priv->id == SPI2_HOST)
+    {
+      periph_trigger = GDMA_MAKE_TRIGGER(GDMA_TRIG_PERIPH_SPI, 2);
+    }
+#if defined(SOC_GDMA_TRIG_PERIPH_SPI3)
+  else if (priv->id == SPI3_HOST)
+    {
+      periph_trigger = GDMA_MAKE_TRIGGER(GDMA_TRIG_PERIPH_SPI, 3);
+    }
+#endif
+  else
+    {
+      DEBUGASSERT(0);
+      return;
+    }
 
-  rx_handle.sibling_chan = priv->dma_channel_tx;
+  SPI_GDMA_NEW_CHANNEL(&tx_handle, &priv->dma_channel_tx, NULL);
+  gdma_connect(priv->dma_channel_tx, periph_trigger);
 
-  SPI_GDMA_NEW_CHANNEL(&rx_handle, &priv->dma_channel_rx);
-  gdma_connect(priv->dma_channel_rx,
-               GDMA_MAKE_TRIGGER(GDMA_TRIG_PERIPH_SPI, 2));
+  SPI_GDMA_NEW_CHANNEL(&rx_handle, NULL, &priv->dma_channel_rx);
+  gdma_connect(priv->dma_channel_rx, periph_trigger);
 }
 #endif
 
@@ -1355,75 +1576,92 @@ static void esp_spi_init(struct spi_dev_s *dev)
   int cs_id = 0;
 #  endif
 #endif
+#ifdef CONFIG_ESPRESSIF_LPSPI0
+  lp_spi_bus_config_t bus_config;
+#endif
 
-  esp_gpiowrite(config->cs_pin, true);
-  esp_gpiowrite(config->mosi_pin, true);
-  esp_gpiowrite(config->miso_pin, true);
-  esp_gpiowrite(config->clk_pin, true);
+  if (priv->id != ESPRESSIF_LPSPI0)
+    {
+      esp_gpiowrite(config->cs_pin, true);
+      esp_gpiowrite(config->mosi_pin, true);
+      esp_gpiowrite(config->miso_pin, true);
+      esp_gpiowrite(config->clk_pin, true);
 
 #if SPI_HAVE_SWCS
-  esp_configgpio(config->cs_pin, OUTPUT_FUNCTION_2);
-  esp_gpio_matrix_out(config->cs_pin, SIG_GPIO_OUT_IDX, 0, 0);
+      esp_configgpio(config->cs_pin, OUTPUT_FUNCTION_2);
+      esp_gpio_matrix_out(config->cs_pin, SIG_GPIO_OUT_IDX, 0, 0);
 #endif
 
 #if SPI_VIA_IOMUX
 #if !SPI_HAVE_SWCS
-  esp_configgpio(config->cs_pin, OUTPUT_FUNCTION_3);
-  esp_gpio_matrix_out(config->cs_pin, SIG_GPIO_OUT_IDX, 0, 0);
+      esp_configgpio(config->cs_pin, OUTPUT_FUNCTION_3);
+      esp_gpio_matrix_out(config->cs_pin, SIG_GPIO_OUT_IDX, 0, 0);
 #endif
-  esp_configgpio(config->mosi_pin, OUTPUT_FUNCTION_3);
-  esp_gpio_matrix_out(config->mosi_pin, SIG_GPIO_OUT_IDX, 0, 0);
+      esp_configgpio(config->mosi_pin, OUTPUT_FUNCTION_3);
+      esp_gpio_matrix_out(config->mosi_pin, SIG_GPIO_OUT_IDX, 0, 0);
 
-  esp_configgpio(config->miso_pin, INPUT_FUNCTION_3 | PULLUP);
-  esp_gpio_matrix_out(config->miso_pin, SIG_GPIO_OUT_IDX, 0, 0);
+      esp_configgpio(config->miso_pin, INPUT_FUNCTION_3 | PULLUP);
+      esp_gpio_matrix_out(config->miso_pin, SIG_GPIO_OUT_IDX, 0, 0);
 
-  esp_configgpio(config->clk_pin, OUTPUT_FUNCTION_3);
-  esp_gpio_matrix_out(config->clk_pin, SIG_GPIO_OUT_IDX, 0, 0);
+      esp_configgpio(config->clk_pin, OUTPUT_FUNCTION_3);
+      esp_gpio_matrix_out(config->clk_pin, SIG_GPIO_OUT_IDX, 0, 0);
 #else
-#if !SPI_HAVE_SWCS
-  esp_configgpio(config->cs_pin, OUTPUT_FUNCTION_2);
-  esp_gpio_matrix_out(config->cs_pin,
-                      spi_periph_signal[priv->id].spics_out[cs_id], 0, 0);
+    #if !SPI_HAVE_SWCS
+      esp_configgpio(config->cs_pin, OUTPUT_FUNCTION_2);
+      esp_gpio_matrix_out(config->cs_pin,
+                          spi_periph_signal[priv->id].spics_out[cs_id],
+                          0, 0);
 #endif
-  esp_configgpio(config->mosi_pin, MOSI_PIN_ATTR);
-  esp_gpio_matrix_out(config->mosi_pin,
-                      spi_periph_signal[priv->id].spid_out, 0, 0);
+      esp_configgpio(config->mosi_pin, MOSI_PIN_ATTR);
+      esp_gpio_matrix_out(config->mosi_pin,
+                          spi_periph_signal[priv->id].spid_out, 0, 0);
 
-  esp_configgpio(config->miso_pin, MISO_PIN_ATTR);
-  esp_gpio_matrix_in(config->miso_pin,
-                     spi_periph_signal[priv->id].spiq_in, 0);
+      esp_configgpio(config->miso_pin, MISO_PIN_ATTR);
+      esp_gpio_matrix_in(config->miso_pin,
+                        spi_periph_signal[priv->id].spiq_in, 0);
 
-  esp_configgpio(config->clk_pin, OUTPUT_FUNCTION_2);
-  esp_gpio_matrix_out(config->clk_pin,
-                      spi_periph_signal[priv->id].spiclk_out, 0, 0);
+      esp_configgpio(config->clk_pin, OUTPUT_FUNCTION_2);
+      esp_gpio_matrix_out(config->clk_pin,
+                          spi_periph_signal[priv->id].spiclk_out, 0, 0);
 #endif
 
-  SPI_COMMON_RCC_CLOCK_ATOMIC()
-    {
-      spi_ll_enable_bus_clock(priv->id, true);
-      spi_ll_reset_register(priv->id);
-    }
+      PERIPH_RCC_ATOMIC()
+        {
+          spi_ll_enable_bus_clock(priv->id, true);
+          spi_ll_reset_register(priv->id);
+        }
 
-  SPI_MASTER_PERI_CLOCK_ATOMIC()
-    {
-      spi_ll_enable_clock(priv->id, true);
-    }
+      SPI_MASTER_PERI_CLOCK_ATOMIC()
+        {
+          spi_ll_enable_clock(priv->id, true);
+        }
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
-  esp_spi_dma_init(dev);
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
+      esp_spi_dma_init(dev);
 
-  priv->ctx->hw = SPI_LL_GET_HW(priv->id);
+      priv->ctx->hw = SPI_LL_GET_HW(priv->id);
 
-  spi_ll_master_init(priv->ctx->hw);
-  spi_ll_enable_int(priv->ctx->hw);
-  spi_ll_set_mosi_delay(priv->ctx->hw, 0, 0);
+      spi_ll_master_init(priv->ctx->hw);
+      spi_ll_enable_int(priv->ctx->hw);
+      spi_ll_set_mosi_delay(priv->ctx->hw, 0, 0);
 #else
-  spi_hal_init(priv->ctx, priv->id);
+      spi_hal_init(priv->ctx, priv->id);
 #endif
 
-  esp_spi_setbits(dev, config->width);
-  esp_spi_setmode(dev, priv->dev_cfg->mode);
-  esp_spi_setfrequency(dev, priv->timing_param->expected_freq);
+      esp_spi_setbits(dev, config->width);
+      esp_spi_setmode(dev, priv->dev_cfg->mode);
+      esp_spi_setfrequency(dev, priv->timing_param->expected_freq);
+    }
+#ifdef CONFIG_ESPRESSIF_LPSPI0
+  else
+    {
+      bus_config.miso_io_num = config->miso_pin;
+      bus_config.mosi_io_num = config->mosi_pin;
+      bus_config.sclk_io_num = config->clk_pin;
+      lp_core_lp_spi_bus_initialize(priv->id, &bus_config);
+      lp_core_lp_spi_bus_add_device(priv->id, &esp_lpspi_device_config);
+    }
+#endif
 }
 
 /****************************************************************************
@@ -1449,7 +1687,8 @@ static void esp_spi_deinit(struct spi_dev_s *dev)
   spi_hal_deinit(priv->ctx);
 
 #if SOC_GDMA_SUPPORTED
-#  ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#  if defined(CONFIG_ESPRESSIF_SPI2_DMA) || \
+      defined(CONFIG_ESPRESSIF_SPI3_DMA)
   if (priv->dma_channel_rx)
     {
       gdma_disconnect(priv->dma_channel_rx);
@@ -1464,7 +1703,7 @@ static void esp_spi_deinit(struct spi_dev_s *dev)
 #  endif
 #endif
 
-  SPI_COMMON_RCC_CLOCK_ATOMIC()
+  PERIPH_RCC_ATOMIC()
     {
       spi_ll_enable_bus_clock(priv->id, false);
     }
@@ -1488,7 +1727,7 @@ static void esp_spi_deinit(struct spi_dev_s *dev)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
 static int esp_spi_interrupt(int irq, void *context, void *arg)
 {
   struct esp_spi_priv_s *priv = (struct esp_spi_priv_s *)arg;
@@ -1518,12 +1757,25 @@ struct spi_dev_s *esp_spibus_initialize(int port)
 {
   struct spi_dev_s *spi_dev;
   struct esp_spi_priv_s *priv;
+#ifdef CONFIG_PM
+  int ret;
+#endif
 
   switch (port)
     {
 #ifdef CONFIG_ESPRESSIF_SPI2
       case ESPRESSIF_SPI2:
         priv = &esp_spi2_priv;
+        break;
+#endif
+#ifdef CONFIG_ESPRESSIF_SPI3
+      case ESPRESSIF_SPI3:
+        priv = &esp_spi3_priv;
+        break;
+#endif
+#ifdef CONFIG_ESPRESSIF_LPSPI0
+      case ESPRESSIF_LPSPI0:
+        priv = &esp_lpspi_priv;
         break;
 #endif
       default:
@@ -1540,48 +1792,55 @@ struct spi_dev_s *esp_spibus_initialize(int port)
       return spi_dev;
     }
 
+#ifdef CONFIG_PM
+#  if CONFIG_ARCH_CHIP_ESP32P4
+  ret = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "spi", &priv->pm_lock);
+#  else
+  ret = esp_pm_lock_create(ESP_PM_APB_FREQ_MAX, 0, "spi", &priv->pm_lock);
+#  endif
+  if (ret != OK)
+    {
+      nxmutex_unlock(&priv->lock);
+      spierr("Failed to create SPI PM lock for SPI:%" PRId8 "\n", priv->id);
+      return NULL;
+    }
+#endif
+
   /* Initialize the blank array */
 
-  for (int i = 0; i < SPI_BLANK_ARRAY_SIZE; i++)
+  if (priv->id != ESPRESSIF_LPSPI0)
     {
-      blank_arr[i] = UINT32_MAX;
-    }
+      for (int i = 0; i < SPI_BLANK_ARRAY_SIZE; i++)
+        {
+          blank_arr[i] = UINT32_MAX;
+        }
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
-  if (priv->cpuint != -ENOMEM)
-    {
-      /* Disable the provided CPU Interrupt to configure it. */
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
+      if (priv->cpuint != -ENOMEM)
+        {
+          /* Disable the provided CPU Interrupt to configure it. */
 
-      up_disable_irq(ESP_SOURCE2IRQ(spi_periph_signal[priv->id].irq));
-    }
+          up_disable_irq(ESP_SOURCE2IRQ(spi_periph_signal[priv->id].irq));
+        }
 
-  priv->cpuint = esp_setup_irq(spi_periph_signal[priv->id].irq,
-                               ESP_IRQ_PRIORITY_DEFAULT,
-                               ESP_IRQ_TRIGGER_LEVEL);
-  if (priv->cpuint < 0)
-    {
-      /* Failed to allocate a CPU interrupt of this type. */
+      priv->cpuint = esp_setup_irq(spi_periph_signal[priv->id].irq,
+                                   ESP_IRQ_PRIORITY_DEFAULT,
+                                   ESP_IRQ_TRIGGER_LEVEL,
+                                   esp_spi_interrupt,
+                                   priv);
+      if (priv->cpuint < 0)
+        {
+          /* Failed to allocate a CPU interrupt of this type. */
 
-      nxmutex_unlock(&priv->lock);
-      return NULL;
-    }
+          nxmutex_unlock(&priv->lock);
+          return NULL;
+        }
 
-  if (irq_attach(ESP_SOURCE2IRQ(spi_periph_signal[priv->id].irq),
-                 esp_spi_interrupt, priv) != OK)
-    {
-      /* Failed to attach IRQ, so CPU interrupt must be freed. */
+      /* Enable the CPU interrupt that is linked to the SPI device. */
 
-      esp_teardown_irq(spi_periph_signal[priv->id].irq, priv->cpuint);
-      priv->cpuint = -ENOMEM;
-      nxmutex_unlock(&priv->lock);
-
-      return NULL;
-    }
-
-  /* Enable the CPU interrupt that is linked to the SPI device. */
-
-  up_enable_irq(ESP_SOURCE2IRQ(spi_periph_signal[priv->id].irq));
+      up_enable_irq(ESP_SOURCE2IRQ(spi_periph_signal[priv->id].irq));
 #endif
+    }
 
   esp_spi_init(spi_dev);
   priv->refs++;
@@ -1622,10 +1881,15 @@ int esp_spibus_uninitialize(struct spi_dev_s *dev)
       return OK;
     }
 
-#ifdef CONFIG_ESPRESSIF_SPI2_DMA
+#if defined(CONFIG_ESPRESSIF_SPI2_DMA) || defined(CONFIG_ESPRESSIF_SPI3_DMA)
   up_disable_irq(ESP_SOURCE2IRQ(spi_periph_signal[priv->id].irq));
   esp_teardown_irq(spi_periph_signal[priv->id].irq, priv->cpuint);
   priv->cpuint = -ENOMEM;
+#endif
+
+#ifdef CONFIG_PM
+  esp_pm_lock_delete(priv->pm_lock);
+  priv->pm_lock = NULL;
 #endif
 
   esp_spi_deinit(dev);

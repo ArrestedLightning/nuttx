@@ -27,7 +27,7 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -47,7 +47,7 @@
 
 #include "hal/i2s_hal.h"
 #include "hal/i2s_ll.h"
-#include "soc/i2s_periph.h"
+#include "hal/i2s_periph.h"
 #include "soc/i2s_reg.h"
 #include "hal/i2s_types.h"
 #include "soc/gpio_sig_map.h"
@@ -64,19 +64,24 @@
 #include "soc/lldesc.h"
 #include "hal/dma_types.h"
 #if SOC_I2S_SUPPORTS_APLL
-#include "hal/clk_tree_ll.h"
-#include "clk_ctrl_os.h"
+#  include "hal/clk_tree_ll.h"
+#  include "clk_ctrl_os.h"
 #endif
-#include "soc/gdma_periph.h"
+#include "hal/gdma_periph.h"
 #include "hal/gdma_ll.h"
 
 #if SOC_CACHE_INTERNAL_MEM_VIA_L1CACHE
-#include "hal/cache_hal.h"
-#include "hal/cache_ll.h"
+#  include "hal/cache_hal.h"
+#  include "hal/cache_ll.h"
 #endif
 
 #if SOC_GDMA_SUPPORTED
-#include "esp_private/gdma.h"
+#  include "esp_private/gdma.h"
+#endif
+
+#ifdef CONFIG_PM
+#  include "soc/soc_caps.h"
+#  include "include/esp_pm.h"
 #endif
 
 /****************************************************************************
@@ -169,18 +174,6 @@
     cfg.sd_dither = 0,                                        \
     cfg.sd_dither2 = 1                                        \
 
-#if SOC_PERIPH_CLK_CTRL_SHARED
-#  define I2S_CLOCK_SRC_ATOMIC() PERIPH_RCC_ATOMIC()
-#else
-#  define I2S_CLOCK_SRC_ATOMIC()
-#endif
-
-#if !SOC_RCC_IS_INDEPENDENT
-#  define I2S_RCC_ATOMIC() PERIPH_RCC_ATOMIC()
-#else
-#  define I2S_RCC_ATOMIC()
-#endif
-
 #if SOC_CACHE_INTERNAL_MEM_VIA_L1CACHE
 #  define I2S_DMA_BUFFER_MAX_SIZE   DMA_DESCRIPTOR_BUFFER_MAX_SIZE_64B_ALIGNED
 #else
@@ -247,6 +240,9 @@ struct esp_i2s_config_s
 
   i2s_hal_context_t *ctx;           /* Common layer struct */
   i2s_hal_clock_info_t *clk_info;   /* Common layer clock info struct */
+#ifdef CONFIG_PM
+  esp_pm_lock_handle_t pm_lock;     /* Power management lock */
+#endif
 };
 
 struct esp_buffer_s
@@ -384,16 +380,16 @@ static uint32_t i2s_get_source_clk_freq(i2s_clock_src_t clk_src,
 static int32_t  i2s_check_mclkfrequency(struct esp_i2s_s *priv);
 static uint32_t i2s_set_datawidth(struct esp_i2s_s *priv);
 static int      i2s_set_clock(struct esp_i2s_s *priv);
-static uint32_t i2s_getmclkfrequency(struct i2s_dev_s *dev);
-static uint32_t i2s_setmclkfrequency(struct i2s_dev_s *dev,
+static int32_t  i2s_getmclkfrequency(struct i2s_dev_s *dev);
+static int32_t  i2s_setmclkfrequency(struct i2s_dev_s *dev,
                                      uint32_t frequency);
 static int      i2s_ioctl(struct i2s_dev_s *dev, int cmd, unsigned long arg);
 
 static void     i2s_tx_channel_start(struct esp_i2s_s *priv);
 static int      i2s_tx_channel_stop(struct esp_i2s_s *priv);
 static int      i2s_txchannels(struct i2s_dev_s *dev, uint8_t channels);
-static uint32_t i2s_txsamplerate(struct i2s_dev_s *dev, uint32_t rate);
-static uint32_t i2s_txdatawidth(struct i2s_dev_s *dev, int bits);
+static int32_t  i2s_txsamplerate(struct i2s_dev_s *dev, uint32_t rate);
+static int32_t  i2s_txdatawidth(struct i2s_dev_s *dev, int bits);
 static int      i2s_send(struct i2s_dev_s *dev, struct ap_buffer_s *apb,
                          i2s_callback_t callback, void *arg,
                          uint32_t timeout);
@@ -408,8 +404,8 @@ static bool     i2s_rx_error(gdma_channel_handle_t dma_chan,
                              void *arg);
 
 static int      i2s_rxchannels(struct i2s_dev_s *dev, uint8_t channels);
-static uint32_t i2s_rxsamplerate(struct i2s_dev_s *dev, uint32_t rate);
-static uint32_t i2s_rxdatawidth(struct i2s_dev_s *dev, int bits);
+static int32_t  i2s_rxsamplerate(struct i2s_dev_s *dev, uint32_t rate);
+static int32_t  i2s_rxdatawidth(struct i2s_dev_s *dev, int bits);
 static int      i2s_receive(struct i2s_dev_s *dev, struct ap_buffer_s *apb,
                             i2s_callback_t callback, void *arg,
                             uint32_t timeout);
@@ -482,6 +478,9 @@ static struct esp_i2s_config_s esp_i2s0_config =
   .audio_std_mode   = I2S_TDM_PHILIPS,
   .ctx              = &ctx_i2s0,
   .clk_info         = &clk_info_i2s0,
+#ifdef CONFIG_PM
+  .pm_lock          = NULL,
+#endif
 };
 
 static struct esp_i2s_s esp_i2s0_priv =
@@ -1568,7 +1567,7 @@ static int i2s_configure(struct esp_i2s_s *priv)
   port = priv->config->port;
 
   i2s_hal_init(priv->config->ctx, port);
-  I2S_RCC_ATOMIC()
+  PERIPH_RCC_ATOMIC()
     {
       i2s_ll_enable_bus_clock(port, true);
       i2s_ll_reset_register(port);
@@ -1625,7 +1624,7 @@ static int i2s_configure(struct esp_i2s_s *priv)
       if (priv->config->tx_en && !priv->config->rx_en)
         {
 #if SOC_I2S_HW_VERSION_2
-          I2S_CLOCK_SRC_ATOMIC()
+          PERIPH_RCC_ATOMIC()
             {
               i2s_ll_mclk_bind_to_tx_clk(priv->config->ctx->dev);
             }
@@ -1680,7 +1679,7 @@ static int i2s_configure(struct esp_i2s_s *priv)
           /* For "rx + master" mode, select RX signal index for ws and bck */
 
 #if SOC_I2S_HW_VERSION_2
-          I2S_CLOCK_SRC_ATOMIC()
+          PERIPH_RCC_ATOMIC()
             {
               i2s_ll_mclk_bind_to_rx_clk(priv->config->ctx->dev);
             }
@@ -2007,6 +2006,13 @@ static uint32_t i2s_get_source_clk_freq(i2s_clock_src_t clk_src,
     }
 #endif
 
+#ifdef I2S_LL_DEFAULT_CLK_SRC
+  if (clk_src == I2S_CLK_SRC_DEFAULT)
+    {
+      clk_src = I2S_LL_DEFAULT_CLK_SRC;
+    }
+#endif
+
   esp_clk_tree_src_get_freq_hz(clk_src,
                                ESP_CLK_TREE_SRC_FREQ_PRECISION_CACHED,
                                &clk_freq);
@@ -2195,7 +2201,7 @@ static int i2s_set_clock(struct esp_i2s_s *priv)
   priv->config->clk_info->mclk_div = mclk_div;
   priv->config->clk_info->sclk = sclk;
 
-  I2S_CLOCK_SRC_ATOMIC()
+  PERIPH_RCC_ATOMIC()
     {
       i2s_hal_set_tx_clock(priv->config->ctx,
                            priv->config->clk_info,
@@ -2229,6 +2235,10 @@ static void i2s_tx_channel_start(struct esp_i2s_s *priv)
 {
   if (priv->config->tx_en)
     {
+#ifdef CONFIG_PM
+      esp_pm_lock_acquire(priv->config->pm_lock);
+#endif
+
       /* Reset the TX channel */
 
       i2s_hal_tx_reset(priv->config->ctx);
@@ -2267,6 +2277,10 @@ static void i2s_rx_channel_start(struct esp_i2s_s *priv)
 {
   if (priv->config->rx_en)
     {
+#ifdef CONFIG_PM
+      esp_pm_lock_acquire(priv->config->pm_lock);
+#endif
+
       /* Reset the RX channel */
 
       i2s_hal_rx_reset(priv->config->ctx);
@@ -2322,6 +2336,9 @@ static int i2s_tx_channel_stop(struct esp_i2s_s *priv)
         }
 
       priv->tx_started = false;
+#ifdef CONFIG_PM
+      esp_pm_lock_release(priv->config->pm_lock);
+#endif
 
       i2sinfo("Stopped TX channel of port %ld\n", priv->config->port);
     }
@@ -2368,6 +2385,9 @@ static int i2s_rx_channel_stop(struct esp_i2s_s *priv)
         }
 
       priv->rx_started = false;
+#ifdef CONFIG_PM
+      esp_pm_lock_release(priv->config->pm_lock);
+#endif
 
       i2sinfo("Stopped RX channel of port %ld\n", priv->config->port);
     }
@@ -2543,7 +2563,7 @@ static bool IRAM_ATTR i2s_rx_interrupt(gdma_channel_handle_t dma_chan,
  *
  ****************************************************************************/
 
-static uint32_t i2s_getmclkfrequency(struct i2s_dev_s *dev)
+static int32_t i2s_getmclkfrequency(struct i2s_dev_s *dev)
 {
   struct esp_i2s_s *priv = (struct esp_i2s_s *)dev;
 
@@ -2567,7 +2587,7 @@ static uint32_t i2s_getmclkfrequency(struct i2s_dev_s *dev)
  *
  ****************************************************************************/
 
-static uint32_t i2s_setmclkfrequency(struct i2s_dev_s *dev,
+static int32_t i2s_setmclkfrequency(struct i2s_dev_s *dev,
                                      uint32_t frequency)
 {
   struct esp_i2s_s *priv = (struct esp_i2s_s *)dev;
@@ -2727,7 +2747,7 @@ static int i2s_rxchannels(struct i2s_dev_s *dev, uint8_t channels)
  *
  ****************************************************************************/
 
-static uint32_t i2s_txsamplerate(struct i2s_dev_s *dev, uint32_t rate)
+static int32_t i2s_txsamplerate(struct i2s_dev_s *dev, uint32_t rate)
 {
   struct esp_i2s_s *priv = (struct esp_i2s_s *)dev;
 
@@ -2785,7 +2805,7 @@ static uint32_t i2s_txsamplerate(struct i2s_dev_s *dev, uint32_t rate)
  *
  ****************************************************************************/
 
-static uint32_t i2s_rxsamplerate(struct i2s_dev_s *dev, uint32_t rate)
+static int32_t i2s_rxsamplerate(struct i2s_dev_s *dev, uint32_t rate)
 {
   struct esp_i2s_s *priv = (struct esp_i2s_s *)dev;
 
@@ -2844,7 +2864,7 @@ static uint32_t i2s_rxsamplerate(struct i2s_dev_s *dev, uint32_t rate)
  *
  ****************************************************************************/
 
-static uint32_t i2s_txdatawidth(struct i2s_dev_s *dev, int bits)
+static int32_t i2s_txdatawidth(struct i2s_dev_s *dev, int bits)
 {
   struct esp_i2s_s *priv = (struct esp_i2s_s *)dev;
 
@@ -2894,7 +2914,7 @@ static uint32_t i2s_txdatawidth(struct i2s_dev_s *dev, int bits)
  *
  ****************************************************************************/
 
-static uint32_t i2s_rxdatawidth(struct i2s_dev_s *dev, int bits)
+static int32_t i2s_rxdatawidth(struct i2s_dev_s *dev, int bits)
 {
   struct esp_i2s_s *priv = (struct esp_i2s_s *)dev;
 
@@ -3255,26 +3275,26 @@ static int i2s_dma_setup(struct esp_i2s_s *priv)
   esp_err_t err;
   gdma_trigger_t trig =
     {
-      .periph = GDMA_TRIG_PERIPH_I2S
+      0
     };
 
   switch (priv->config->port)
     {
 #if SOC_I2S_NUM > 2
       case I2S_NUM_2:
-        trig.instance_id = SOC_GDMA_TRIG_PERIPH_I2S2;
+        trig = GDMA_MAKE_TRIGGER(GDMA_TRIG_PERIPH_I2S, 2);
         break;
 #endif
 
 #if SOC_I2S_NUM > 1
       case I2S_NUM_1:
-        trig.instance_id = SOC_GDMA_TRIG_PERIPH_I2S1;
-        break;
+      trig = GDMA_MAKE_TRIGGER(GDMA_TRIG_PERIPH_I2S, 1);
+      break;
 #endif
 
       case I2S_NUM_0:
-        trig.instance_id = SOC_GDMA_TRIG_PERIPH_I2S0;
-        break;
+      trig = GDMA_MAKE_TRIGGER(GDMA_TRIG_PERIPH_I2S, 0);
+      break;
 
       default:
         i2serr("Unsupported I2S port number");
@@ -3291,11 +3311,10 @@ static int i2s_dma_setup(struct esp_i2s_s *priv)
     {
       gdma_channel_alloc_config_t tx_handle =
         {
-          .direction = GDMA_CHANNEL_DIRECTION_TX,
-          .flags.reserve_sibling = 1,
+          0
         };
 
-      err = gdma_new_ahb_channel(&tx_handle, &priv->dma_channel_tx);
+      err = gdma_new_ahb_channel(&tx_handle, &priv->dma_channel_tx, NULL);
       if (err != ESP_OK)
         {
           i2serr("Failed to register tx dma channel: %d\n", err);
@@ -3334,11 +3353,10 @@ static int i2s_dma_setup(struct esp_i2s_s *priv)
     {
       gdma_channel_alloc_config_t rx_handle =
         {
-          .direction = GDMA_CHANNEL_DIRECTION_RX,
-          .flags.reserve_sibling = 1,
+          0
         };
 
-      err = gdma_new_ahb_channel(&rx_handle, &priv->dma_channel_rx);
+      err = gdma_new_ahb_channel(&rx_handle, NULL, &priv->dma_channel_rx);
       if (err != ESP_OK)
         {
           i2serr("Failed to register rx dma channel: %d\n", err);
@@ -3419,6 +3437,9 @@ struct i2s_dev_s *esp_i2sbus_initialize(int port)
   int ret;
   struct esp_i2s_s *priv = NULL;
   irqstate_t flags;
+#ifdef CONFIG_PM
+  esp_pm_lock_type_t pm_type = ESP_PM_APB_FREQ_MAX;
+#endif
 
   i2sinfo("port: %d\n", port);
 
@@ -3444,6 +3465,30 @@ struct i2s_dev_s *esp_i2sbus_initialize(int port)
     }
 
   flags = spin_lock_irqsave(&priv->slock);
+
+#ifdef CONFIG_PM
+#  if SOC_I2S_SUPPORTS_APLL && SOC_I2S_HW_VERSION_2
+  if (priv.tx_clk_src == I2S_CLK_SRC_APLL &&
+      priv.tx_clk_src == I2S_CLK_SRC_APLL)
+    {
+      pm_type = ESP_PM_NO_LIGHT_SLEEP;
+    }
+#  endif
+
+  if (priv->config->pm_lock == NULL)
+    {
+      esp_pm_lock_handle_t pm_lock = priv->config->pm_lock;
+      ret =  esp_pm_lock_create(pm_type,
+                                0,
+                                "i2s_driver",
+                                &pm_lock);
+      if (ret != OK)
+        {
+          i2serr("Failed to create I2S PM lock\n");
+          goto err;
+        }
+    }
+#endif
 
   ret = i2s_configure(priv);
   if (ret < 0)

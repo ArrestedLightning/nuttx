@@ -37,11 +37,17 @@
 #include <math.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+/* Only float data type supported now */
+
+#ifdef CONFIG_SENSORS_USE_B16
+#  error fixed-point data type not supported yet
+#endif
 
 #define WTGAHRS2_ACCEL_IDX         0
 #define WTGAHRS2_GYRO_IDX          1

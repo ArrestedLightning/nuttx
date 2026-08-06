@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #ifdef CONFIG_SERIAL_TERMIOS
 #  include <termios.h>
@@ -267,7 +267,7 @@ static void esp_rxint(struct uart_dev_s *dev, bool enable)
  * Description:
  *   Configure the UART to operation in interrupt driven mode. This method
  *   is called when the serial port is opened. Normally, this is just after
- *   the the setup() method is called, however, the serial console may
+ *   the setup() method is called, however, the serial console may
  *   operate in a non-interrupt driven mode during the boot phase.
  *
  *   RX and TX interrupts are not enabled by the attach method (unless
@@ -280,7 +280,6 @@ static void esp_rxint(struct uart_dev_s *dev, bool enable)
 static int esp_attach(struct uart_dev_s *dev)
 {
   struct esp_priv_s *priv = dev->priv;
-  int ret;
 
   DEBUGASSERT(priv->cpuint == -ENOMEM);
 
@@ -297,7 +296,9 @@ static int esp_attach(struct uart_dev_s *dev)
 
   priv->cpuint = esp_setup_irq(priv->source,
                                ESP_IRQ_PRIORITY_DEFAULT,
-                               ESP_IRQ_TRIGGER_LEVEL);
+                               ESP_IRQ_TRIGGER_LEVEL,
+                               esp_interrupt,
+                               dev);
   if (priv->cpuint < 0)
     {
       return priv->cpuint;
@@ -305,8 +306,7 @@ static int esp_attach(struct uart_dev_s *dev)
 
   /* Attach and enable the IRQ */
 
-  ret = irq_attach(priv->irq, esp_interrupt, dev);
-  if (ret == OK)
+  if (priv->cpuint >= 0)
     {
       up_enable_irq(priv->irq);
     }
@@ -315,7 +315,7 @@ static int esp_attach(struct uart_dev_s *dev)
       up_disable_irq(priv->irq);
     }
 
-  return ret;
+  return OK;
 }
 
 /****************************************************************************

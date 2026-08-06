@@ -109,7 +109,7 @@ bool nxnotify_cancellation(FAR struct tcb_s *tcb)
   /* Check to see if this task has the non-cancelable bit set. */
 
   if ((tcb->flags & TCB_FLAG_FORCED_CANCEL) == 0 &&
-      (tls->tl_cpstate & CANCEL_FLAG_NONCANCELABLE) != 0)
+      (tls->tl_cpstate & CANCEL_FLAG_NONCANCELABLE) != 0u)
     {
       /* Then we cannot cancel the thread now.  Here is how this is
        * supposed to work:
@@ -125,14 +125,13 @@ bool nxnotify_cancellation(FAR struct tcb_s *tcb)
        */
 
       tls->tl_cpstate |= CANCEL_FLAG_CANCEL_PENDING;
-      leave_critical_section(flags);
-      return true;
+      ret = true;
     }
 
 #ifdef CONFIG_CANCELLATION_POINTS
   /* Check if this task supports deferred cancellation */
 
-  if ((tls->tl_cpstate & CANCEL_FLAG_CANCEL_ASYNC) == 0)
+  if (!ret && (tls->tl_cpstate & CANCEL_FLAG_CANCEL_ASYNC) == 0u)
     {
       /* Then we cannot cancel the task asynchronously. */
 

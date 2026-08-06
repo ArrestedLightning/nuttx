@@ -59,7 +59,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 
 /****************************************************************************
@@ -185,8 +185,10 @@ static struct rp2040_flash_dev_s my_dev =
     NULL,
 #endif
     rp2040_flash_ioctl,
+#ifdef CONFIG_FTL_BBM
     NULL,
     NULL,
+#endif
     "rp_flash"
   },
   .lock = NXMUTEX_INITIALIZER,
@@ -728,7 +730,7 @@ struct mtd_dev_s *rp2040_flash_mtd_initialize(void)
 
   /* Instead of using the rom_function for flash_enable_xip, we use the one
    * from boot stage 2 loaded at the beginning of the XIP rom. We do this
-   * because the boot_rom version can result in slower access to the the
+   * because the boot_rom version can result in slower access to the
    * XIP memory.
    *
    * We need to make our own copy of this code in ram since we cannot use

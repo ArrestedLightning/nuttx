@@ -74,6 +74,10 @@ ifeq ($(CONFIG_ESPRESSIF_ADC),y)
   CSRCS += esp32s3_board_adc.c
 endif
 
+ifeq ($(CONFIG_SENSORS_QMI8658),y)
+  CSRCS += esp32s3_qmi8658.c
+endif
+
 ifeq ($(CONFIG_NET_LAN9250),y)
   CSRCS += esp32s3_lan9250.c
 endif
@@ -108,6 +112,9 @@ endif
 
 ifeq ($(CONFIG_ETC_ROMFS),y)
   RCSRCS  = etc/init.d/rc.sysinit etc/init.d/rcS
+ifeq ($(CONFIG_SYSTEM_NXINIT),y)
+  RCSRCS += etc/init.d/init.rc
+endif
 ifeq ($(CONFIG_TXTABLE_PARTITION),y)
   RCRAWS  = etc/txtable.txt
 endif

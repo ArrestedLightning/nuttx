@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #ifdef CONFIG_RTC
 #  include <nuttx/irq.h>
@@ -38,6 +38,7 @@
 
 #include <nuttx/arch.h>
 #include <nuttx/clock.h>
+#include <nuttx/clock_notifier.h>
 #include <nuttx/trace.h>
 
 #include <nuttx/spinlock.h>
@@ -151,7 +152,6 @@ int clock_basetime(FAR struct timespec *tp)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_RTC
 static void clock_inittime(FAR const struct timespec *tp)
 {
   /* (Re-)initialize the time value to match the RTC */
@@ -183,11 +183,11 @@ static void clock_inittime(FAR const struct timespec *tp)
     }
 
   spin_unlock_irqrestore(&g_basetime_lock, flags);
+  clock_notifier_call_chain(CLOCK_REALTIME, &g_basetime);
 #else
   clock_inittimekeeping(tp);
 #endif
 }
-#endif
 
 /****************************************************************************
  * Public Functions
@@ -220,15 +220,14 @@ void clock_initialize(void)
 
   up_rtc_initialize();
 
-#if !defined(CONFIG_RTC_EXTERNAL)
+#endif
+
+#if !defined(CONFIG_RTC_EXTERNAL) || \
+    !defined(CONFIG_RTC)
   /* Initialize the time value to match the RTC */
 
   clock_inittime(NULL);
 #endif
-
-#endif
-
-  perf_init();
 
 #ifdef CONFIG_SCHED_CPULOAD_SYSCLK
   cpuload_init();

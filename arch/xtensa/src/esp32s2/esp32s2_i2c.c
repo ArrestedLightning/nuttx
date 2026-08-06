@@ -27,7 +27,7 @@
 #ifdef CONFIG_ESPRESSIF_I2C_PERIPH_MASTER_MODE
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -46,9 +46,9 @@
 
 #include <arch/board/board.h>
 
-#include "esp32s2_gpio.h"
+#include "espressif/esp_gpio.h"
 #include "esp32s2_i2c.h"
-#include "esp32s2_irq.h"
+#include "espressif/esp_irq.h"
 
 #include "xtensa.h"
 #include "hardware/esp32s2_gpio_sigmap.h"
@@ -749,15 +749,15 @@ static void i2c_init(struct esp32s2_i2c_priv_s *priv)
   const struct esp32s2_i2c_config_s *config = priv->config;
   if (priv->id != ESP32S2_RTC_I2C)
     {
-      esp32s2_gpiowrite(config->scl_pin, 1);
-      esp32s2_configgpio(config->scl_pin, INPUT_PULLUP | OUTPUT_OPEN_DRAIN);
-      esp32s2_gpio_matrix_out(config->scl_pin, config->scl_outsig, 0, 0);
-      esp32s2_gpio_matrix_in(config->scl_pin, config->scl_insig, 0);
+      esp_gpiowrite(config->scl_pin, 1);
+      esp_configgpio(config->scl_pin, INPUT_PULLUP | OUTPUT_OPEN_DRAIN);
+      esp_gpio_matrix_out(config->scl_pin, config->scl_outsig, 0, 0);
+      esp_gpio_matrix_in(config->scl_pin, config->scl_insig, 0);
 
-      esp32s2_gpiowrite(config->sda_pin, 1);
-      esp32s2_configgpio(config->sda_pin, INPUT_PULLUP | OUTPUT_OPEN_DRAIN);
-      esp32s2_gpio_matrix_out(config->sda_pin, config->sda_outsig, 0, 0);
-      esp32s2_gpio_matrix_in(config->sda_pin, config->sda_insig, 0);
+      esp_gpiowrite(config->sda_pin, 1);
+      esp_configgpio(config->sda_pin, INPUT_PULLUP | OUTPUT_OPEN_DRAIN);
+      esp_gpio_matrix_out(config->sda_pin, config->sda_outsig, 0, 0);
+      esp_gpio_matrix_in(config->sda_pin, config->sda_insig, 0);
 
       /* Enable I2C hardware */
 
@@ -1452,7 +1452,7 @@ static void i2c_traceevent(struct esp32s2_i2c_priv_s *priv,
 #ifdef CONFIG_I2C_TRACE
 static void i2c_tracedump(struct esp32s2_i2c_priv_s *priv)
 {
-  syslog(LOG_DEBUG, "Elapsed time: %" PRIu32 "\n",
+  syslog(LOG_DEBUG, "Elapsed time: %" PRId64 "\n",
          clock_systime_ticks() - priv->start_time);
 
   for (int i = 0; i < priv->tndx; i++)
@@ -1460,7 +1460,7 @@ static void i2c_tracedump(struct esp32s2_i2c_priv_s *priv)
       struct esp32s2_trace_s *trace = &priv->trace[i];
       syslog(LOG_DEBUG,
              "%2d. STATUS: %08" PRIx32 " COUNT: %3" PRIu32 " EVENT: %s(%2d)"
-             " PARM: %08" PRIx32 " TIME: %" PRIu32 "\n",
+             " PARM: %08" PRIx32 " TIME: %" PRId64 "\n",
              i + 1, trace->status, trace->count, g_trace_names[trace->event],
              trace->event, trace->parm, trace->time - priv->start_time);
     }
@@ -1698,8 +1698,9 @@ struct i2c_master_s *esp32s2_i2cbus_initialize(int port)
 
       /* Set up to receive peripheral interrupts on the current CPU */
 
-      priv->cpuint = esp32s2_setup_irq(config->periph,
-                                       1, ESP32S2_CPUINT_LEVEL);
+      priv->cpuint = esp_setup_irq(config->periph,
+                                   1, ESP_IRQ_TRIGGER_LEVEL,
+                                   i2c_irq, priv);
       if (priv->cpuint < 0)
         {
           /* Failed to allocate a CPU interrupt of this type */
@@ -1707,16 +1708,6 @@ struct i2c_master_s *esp32s2_i2cbus_initialize(int port)
           priv->refs--;
           nxmutex_unlock(&priv->lock);
 
-          return NULL;
-        }
-
-      ret = irq_attach(config->irq, i2c_irq, priv);
-      if (ret != OK)
-        {
-          esp32s2_teardown_irq(config->periph, priv->cpuint);
-          priv->refs--;
-
-          nxmutex_unlock(&priv->lock);
           return NULL;
         }
 
@@ -1768,7 +1759,7 @@ int esp32s2_i2cbus_uninitialize(struct i2c_master_s *dev)
     {
 #ifndef CONFIG_I2C_POLLED
       up_disable_irq(priv->config->irq);
-      esp32s2_teardown_irq(priv->config->periph, priv->cpuint);
+      esp_teardown_irq(priv->config->periph, priv->cpuint);
 #endif
 
       i2c_deinit(priv);

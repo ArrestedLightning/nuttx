@@ -49,6 +49,12 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* Only float data type supported now */
+
+#ifdef CONFIG_SENSORS_USE_B16
+#  error fixed-point data type not supported yet
+#endif
+
 #define CONSTANTS_ONE_G 9.8f
 
 /****************************************************************************
@@ -136,6 +142,7 @@ static const struct sensor_ops_s g_sensor_ops =
   NULL,                 /* set_calibvalue */
   NULL,                 /* calibrate */
   NULL,                 /* get_info */
+  NULL,                 /* set_nonwakeup */
   .control      = lsm9ds1_control
 };
 

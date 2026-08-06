@@ -28,7 +28,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/nuttx.h>
 #include <nuttx/kmalloc.h>
@@ -44,6 +44,12 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+/* Only float data type supported now */
+
+#ifdef CONFIG_SENSORS_USE_B16
+#  error fixed-point data type not supported yet
+#endif
 
 #define LTR308_ADDR           0x53
 #define DEVID                 0xB1
@@ -103,6 +109,7 @@ static const struct sensor_ops_s g_sensor_ops =
   NULL,               /* set_calibvalue */
   ltr308_calibrate,   /* calibrate */
   NULL,               /* get_info */
+  NULL,               /* set_nonwakeup */
   NULL                /* control */
 };
 

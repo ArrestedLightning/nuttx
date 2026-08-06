@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <sys/param.h>
 
@@ -53,15 +53,11 @@
  ****************************************************************************/
 
 #ifdef CONFIG_ESP32_OTA_PARTITION_ENCRYPT
-#  define OTA_ENCRYPT true
-#else
-#  define OTA_ENCRYPT false
+#  warning "CONFIG_ESP32_OTA_PARTITION_ENCRYPT is deprecated"
 #endif
 
 #ifdef CONFIG_ESP32_STORAGE_MTD_ENCRYPT
-#  define STORAGE_ENCRYPT true
-#else
-#  define STORAGE_ENCRYPT false
+#  warning "CONFIG_ESP32_STORAGE_MTD_ENCRYPT is deprecated"
 #endif
 
 /****************************************************************************
@@ -113,8 +109,9 @@ static int init_ota_partitions(void)
 {
   struct mtd_dev_s *mtd;
   int ret = OK;
+  int i;
 
-  for (int i = 0; i < nitems(g_ota_partition_table); ++i)
+  for (i = 0; i < nitems(g_ota_partition_table); ++i)
     {
       const struct partition_s *part = &g_ota_partition_table[i];
       mtd = esp_spiflash_alloc_mtdpart(part->firstblock, part->blocksize);
@@ -444,12 +441,6 @@ static int init_storage_partition(void)
 int board_spiflash_init(void)
 {
   int ret = OK;
-
-  ret = esp_spiflash_init();
-  if (ret < 0)
-    {
-      return ret;
-    }
 
 #ifdef CONFIG_ESP32_HAVE_OTA_PARTITION
   ret = init_ota_partitions();

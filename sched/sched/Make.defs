@@ -79,9 +79,9 @@ endif
 endif
 
 ifeq ($(CONFIG_SCHED_TICKLESS),y)
-CSRCS += sched_timerexpiration.c
+CSRCS += sched_processtickless.c
 else
-CSRCS += sched_processtimer.c
+CSRCS += sched_processtick.c
 endif
 
 ifeq ($(CONFIG_SCHED_CRITMONITOR),y)

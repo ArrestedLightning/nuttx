@@ -74,20 +74,42 @@ static void nxsched_timeout(wdparm_t arg)
 
 void nxsched_ticksleep(unsigned int ticks)
 {
-  FAR struct tcb_s *rtcb;
-  irqstate_t flags;
-
   if (ticks == 0)
     {
       sched_yield();
       return;
     }
 
+  nxsched_abstick_sleep(clock_delay2abstick(ticks));
+}
+
+/****************************************************************************
+ * Name: nxsched_abstick_sleep
+ *
+ * Description:
+ *   The nxsched_abstick_sleep() function will cause the calling thread to be
+ *   suspended from execution to the specified ticks.
+ *
+ *   It can only be resumed through scheduler operations.
+ *
+ * Input Parameters:
+ *   ticks - Absolute time in clock ticks.
+ *
+ * Returned Value:
+ *   None
+ *
+ ****************************************************************************/
+
+void nxsched_abstick_sleep(clock_t ticks)
+{
+  FAR struct tcb_s *rtcb;
+  irqstate_t flags;
+
   flags = enter_critical_section();
 
   rtcb = this_task();
 
-  wd_start(&rtcb->waitdog, ticks, nxsched_timeout, (uintptr_t)rtcb);
+  wd_start_abstick(&rtcb->waitdog, ticks, nxsched_timeout, (uintptr_t)rtcb);
 
   /* Remove the tcb task from the ready-to-run list. */
 
@@ -220,4 +242,79 @@ void nxsched_msleep(unsigned int msec)
 void nxsched_sleep(unsigned int sec)
 {
   nxsched_ticksleep(SEC2TICK(sec));
+}
+
+/****************************************************************************
+ * Name: nxsched_nanosleep
+ *
+ * Description:
+ *   Internal nanosleep implementation used by the scheduler. This function
+ *   converts the requested sleep interval into system ticks, performs a
+ *   tick-based blocking sleep, and optionally returns the remaining time if
+ *   the sleep is interrupted by a signal.
+ *
+ * Input Parameters:
+ *   rqtp - Requested sleep interval (may be NULL)
+ *   rmtp - If the rmtp argument is non-NULL, the timespec structure
+ *          referenced by it is updated to contain the amount of time
+ *          remaining.
+ *
+ * Returned Value:
+ *   Returns OK (0) on success.  Returns -EINVAL for an invalid timespec
+ *   argument and -EAGAIN for a zero-length timeout, as required by POSIX.
+ *
+ ****************************************************************************/
+
+int nxsched_nanosleep(FAR const struct timespec *rqtp,
+                      FAR struct timespec *rmtp)
+{
+  clock_t ticks;
+  clock_t expect = 0;
+  clock_t stop;
+
+  /* Validate the input timespec */
+
+  if (rqtp && (rqtp->tv_nsec < 0 || rqtp->tv_nsec >= 1000000000))
+    {
+      return -EINVAL;
+    }
+
+  /* Zero-length sleep: Yield the processor and return -EAGAIN */
+
+  if (rqtp && rqtp->tv_sec == 0 && rqtp->tv_nsec == 0)
+    {
+      sched_yield();
+      return -EAGAIN;
+    }
+
+  /* Convert the requested interval to system ticks */
+
+  ticks = clock_time2ticks(rqtp);
+
+  /* Compute the absolute tick value when the sleep should expire.
+   * This is used later to determine the remaining time after interruption.
+   */
+
+  expect = clock_delay2abstick(ticks);
+
+  /* Perform the blocking tick-based sleep */
+
+  nxsched_ticksleep(ticks);
+
+  /* Capture the current tick count after waking up */
+
+  stop = clock_systime_ticks();
+
+  /* If the caller provided a buffer for the remaining time, compute how much
+   * of the original interval is left.  If the sleep expired normally,
+   * expect <= stop and the remaining time becomes zero.
+   */
+
+  if (rmtp)
+    {
+      clock_ticks2time(rmtp,
+                       clock_compare(stop, expect) ? expect - stop : 0);
+    }
+
+  return OK;
 }

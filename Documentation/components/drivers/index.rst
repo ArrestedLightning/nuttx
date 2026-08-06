@@ -159,7 +159,7 @@ Subdirectories of ``nuttx/drivers``
 
   Motor control drivers.
 
-* ``mtd/`` :doc:`special/mtd`
+* ``mtd/`` :doc:`special/mtd/index`
 
   Memory Technology Device (MTD) drivers.  Some simple drivers for
   memory technologies like FLASH, EEPROM, NVRAM, etc.
@@ -206,7 +206,7 @@ Subdirectories of ``nuttx/drivers``
 
   RF Device Support.
 
-* ``rptun/`` :doc:`special/rptun`
+* ``rptun/`` :doc:`special/rptun/index`
 
   Remote Proc Tunnel Driver Support.
 
@@ -267,7 +267,7 @@ Subdirectories of ``nuttx/drivers``
 
   Video-related drivers.
 
-* ``virtio/`` :doc:`special/virtio`
+* ``virtio/`` :doc:`special/virtio/index`
 
   Virtio Device Support.
 

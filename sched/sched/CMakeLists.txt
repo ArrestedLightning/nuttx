@@ -97,9 +97,9 @@ if(NOT CONFIG_SCHED_CPULOAD_NONE)
 endif()
 
 if(CONFIG_SCHED_TICKLESS)
-  list(APPEND SRCS sched_timerexpiration.c)
+  list(APPEND SRCS sched_processtickless.c)
 else()
-  list(APPEND SRCS sched_processtimer.c)
+  list(APPEND SRCS sched_processtick.c)
 endif()
 
 if(CONFIG_SCHED_CRITMONITOR)

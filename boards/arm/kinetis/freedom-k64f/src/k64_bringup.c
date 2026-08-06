@@ -29,7 +29,7 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/fs/fs.h>
 
@@ -40,12 +40,6 @@
 
 #ifdef CONFIG_USERLED
 #  include <nuttx/leds/userled.h>
-#endif
-
-#ifdef CONFIG_EXAMPLES_LEDS_DEVPATH
-#  define LED_DRIVER_PATH CONFIG_EXAMPLES_LEDS_DEVPATH
-#else
-#  define LED_DRIVER_PATH "/dev/userleds"
 #endif
 
 #include <nuttx/spi/spi_transfer.h>
@@ -77,7 +71,7 @@ int k64_bringup(void)
 #ifdef HAVE_LEDS
   /* Register the LED driver */
 
-  ret = userled_lower_initialize(LED_DRIVER_PATH);
+  ret = userled_lower_initialize("/dev/userleds");
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: userled_lower_initialize() failed: %d\n", ret);

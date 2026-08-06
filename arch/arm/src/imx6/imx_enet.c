@@ -33,12 +33,13 @@
 #include <time.h>
 #include <string.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <endian.h>
 
 #include <arpa/inet.h>
 
+#include <nuttx/arch.h>
 #include <nuttx/wdog.h>
 #include <nuttx/irq.h>
 #include <nuttx/arch.h>
@@ -1398,7 +1399,14 @@ static int imx_ifup(struct net_driver_s *dev)
 {
   /* The externally available ifup action includes resetting the phy */
 
-  return imx_ifup_action(dev, true);
+  int ret = imx_ifup_action(dev, true);
+
+  if (ret == OK)
+    {
+      netdev_carrier_on(dev);
+    }
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1450,6 +1458,9 @@ static int imx_ifdown(struct net_driver_s *dev)
 
   priv->bifup = false;
   leave_critical_section(flags);
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 
@@ -2581,7 +2592,7 @@ int imx_netinitialize(int intf)
 
   /* Configure as a (high) level interrupt */
 
-  arm_gic_irq_trigger(IMX_IRQ_ENET0, false);
+  up_set_irq_type(IMX_IRQ_ENET0, IRQ_HIGH_LEVEL);
 
 #ifdef CONFIG_NET_ETHERNET
   /* Determine a semi-unique MAC address from MCU UID

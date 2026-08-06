@@ -39,7 +39,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <arch/board/board.h>
 #include <nuttx/irq.h>
@@ -2789,7 +2789,8 @@ static int mcan_ioctl(struct can_dev_s *dev, int cmd, unsigned long arg)
           uint8_t state;
 
           DEBUGASSERT(bt != NULL);
-          DEBUGASSERT(bt->bt_baud < SAMV7_MCANCLK_FREQUENCY);
+          DEBUGASSERT(bt->bt_baud > 0  &&
+            bt->bt_baud < SAMV7_MCANCLK_FREQUENCY);
           DEBUGASSERT(bt->bt_sjw > 0 && bt->bt_sjw <= 16);
           DEBUGASSERT(bt->bt_tseg1 > 1 && bt->bt_tseg1 <= 64);
           DEBUGASSERT(bt->bt_tseg2 > 0 && bt->bt_tseg2 <= 16);

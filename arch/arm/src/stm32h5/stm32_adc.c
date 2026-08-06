@@ -31,7 +31,7 @@
 
 #include <errno.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <string.h>
 
 #include <arch/board/board.h>
@@ -53,7 +53,7 @@
 
 #ifdef CONFIG_ADC
 
-#if defined(CONFIG_STM32H5_ADC1) || defined(CONFIG_STM32H5_ADC2)
+#if defined(CONFIG_STM32_ADC1) || defined(CONFIG_STM32_ADC2)
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -168,7 +168,7 @@ struct stm32_dev_s
 
   /* List of selected ADC channels to sample */
 
-  uint8_t chanlist[CONFIG_STM32H5_ADC_MAX_SAMPLES];
+  uint8_t chanlist[CONFIG_STM32_ADC_MAX_SAMPLES];
 };
 
 /****************************************************************************
@@ -260,7 +260,7 @@ static const struct adc_ops_s g_adcops =
 
 /* ADC1 state */
 
-#ifdef CONFIG_STM32H5_ADC1
+#ifdef CONFIG_STM32_ADC1
 
 /* Double the size of the buffer in circular mode
  * Circular mode utilizes half-transfer DMA interrupts and a 2x buffer
@@ -269,10 +269,10 @@ static const struct adc_ops_s g_adcops =
  */
 
 #ifdef ADC1_HAVE_DMA
-#  define ADC1_CHAN_BUFFER_SIZE (CONFIG_STM32H5_ADC_MAX_SAMPLES *\
-                                 CONFIG_STM32H5_ADC1_DMA_BATCH)
+#  define ADC1_CHAN_BUFFER_SIZE (CONFIG_STM32_ADC_MAX_SAMPLES *\
+                                 CONFIG_STM32_ADC1_DMA_BATCH)
 
-#  ifdef CONFIG_STM32H5_ADC1_DMA_CFG
+#  if CONFIG_STM32_ADC1_DMA_CFG == 1
 #    define ADC1_DMA_BUFFER_SIZE (ADC1_CHAN_BUFFER_SIZE * 2)
 #  else
 #    define ADC1_DMA_BUFFER_SIZE (ADC1_CHAN_BUFFER_SIZE)
@@ -290,18 +290,18 @@ static struct stm32_dev_s g_adcpriv1 =
   .irq         = STM32_IRQ_ADC1,
   .isr         = adc12_interrupt,
   .intf        = 1,
-  .resolution  = CONFIG_STM32H5_ADC1_RESOLUTION,
+  .resolution  = CONFIG_STM32_ADC1_RESOLUTION,
   .base        = STM32_ADC1_BASE,
   .mbase       = STM32_ADC1_BASE,
   .initialized = false,
 #ifdef ADC1_HAVE_TIMER
-  .trigger     = CONFIG_STM32H5_ADC1_TIMTRIG,
+  .trigger     = CONFIG_STM32_ADC1_TIMTRIG,
   .tbase       = ADC1_TIMER_BASE,
   .trcc_enr    = ADC1_TIMER_RCC_ENR,
   .trcc_en     = ADC1_TIMER_RCC_EN,
   .extsel      = ADC1_EXTSEL_VALUE,
   .pclck       = ADC1_TIMER_PCLK_FREQUENCY,
-  .freq        = CONFIG_STM32H5_ADC1_SAMPLE_FREQUENCY,
+  .freq        = CONFIG_STM32_ADC1_SAMPLE_FREQUENCY,
 #endif
 
 #ifdef BOARD_ADC1_DIFSEL
@@ -326,8 +326,8 @@ static struct stm32_dev_s g_adcpriv1 =
   .hasdma       = true,
   .r_chanbuffer = g_adc1_chanbuffer,
   .r_dmabuffer  = g_adc1_dmabuffer,
-  .dmabatch     = CONFIG_STM32H5_ADC1_DMA_BATCH,
-#  ifdef CONFIG_STM32H5_ADC1_DMA_CFG
+  .dmabatch     = CONFIG_STM32_ADC1_DMA_BATCH,
+#  if CONFIG_STM32_ADC1_DMA_CFG == 1
   .circular     = true,
 #  else
   .circular     = false,
@@ -338,25 +338,25 @@ static struct stm32_dev_s g_adcpriv1 =
 
 #ifdef ADC1_HAVE_OVERSAMPLE
   .oversample = true,
-#  ifdef CONFIG_STM32H5_ADC1_TROVS
+#  ifdef CONFIG_STM32_ADC1_TROVS
   .trovs = true,
 #  else
   .trovs = false,
 #  endif
-  .ovsr = CONFIG_STM32H5_ADC1_OVSR,
-  .ovss = CONFIG_STM32H5_ADC1_OVSS,
+  .ovsr = CONFIG_STM32_ADC1_OVSR,
+  .ovss = CONFIG_STM32_ADC1_OVSS,
 #else
   .oversample = false,
 #endif
 
-#ifdef CONFIG_STM32H5_ADC1_WDG1
+#ifdef CONFIG_STM32_ADC1_WDG1
   .wdg1_enable = true,
-  .wdg1_flt = CONFIG_STM32H5_ADC1_WDG1_FLT,
-  .wdg1_low_thresh = CONFIG_STM32H5_ADC1_WDG1_LOWTHRESH,
-  .wdg1_high_thresh = CONFIG_STM32H5_ADC1_WDG1_HIGHTHRESH,
-#  ifdef CONFIG_STM32H5_ADC1_WDG1_SGL
+  .wdg1_flt = CONFIG_STM32_ADC1_WDG1_FLT,
+  .wdg1_low_thresh = CONFIG_STM32_ADC1_WDG1_LOWTHRESH,
+  .wdg1_high_thresh = CONFIG_STM32_ADC1_WDG1_HIGHTHRESH,
+#  ifdef CONFIG_STM32_ADC1_WDG1_SGL
   .wdg1_single_chan = true,
-  .wdg1_chan = CONFIG_STM32H5_ADC1_WDG1_CHAN,
+  .wdg1_chan = CONFIG_STM32_ADC1_WDG1_CHAN,
 #  else
   .wdg1_single_chan = false,
   .wdg1_chan = 0,
@@ -375,13 +375,13 @@ static struct adc_dev_s g_adcdev1 =
 
 /* ADC2 state */
 
-#ifdef CONFIG_STM32H5_ADC2
+#ifdef CONFIG_STM32_ADC2
 
 #ifdef ADC2_HAVE_DMA
-#  define ADC2_CHAN_BUFFER_SIZE (CONFIG_STM32H5_ADC_MAX_SAMPLES *\
-                                 CONFIG_STM32H5_ADC2_DMA_BATCH)
+#  define ADC2_CHAN_BUFFER_SIZE (CONFIG_STM32_ADC_MAX_SAMPLES *\
+                                 CONFIG_STM32_ADC2_DMA_BATCH)
 
-#  ifdef CONFIG_STM32H5_ADC2_DMA_CFG
+#  ifdef CONFIG_STM32_ADC2_DMA_CFG
 #    define ADC2_DMA_BUFFER_SIZE (ADC2_CHAN_BUFFER_SIZE * 2)
 #  else
 #    define ADC2_DMA_BUFFER_SIZE (ADC2_CHAN_BUFFER_SIZE)
@@ -399,18 +399,18 @@ static struct stm32_dev_s g_adcpriv2 =
   .irq         = STM32_IRQ_ADC2,
   .isr         = adc12_interrupt,
   .intf        = 2,
-  .resolution  = CONFIG_STM32H5_ADC2_RESOLUTION,
+  .resolution  = CONFIG_STM32_ADC2_RESOLUTION,
   .base        = STM32_ADC2_BASE,
   .mbase       = STM32_ADC2_BASE,
   .initialized = false,
 #ifdef ADC2_HAVE_TIMER
-  .trigger     = CONFIG_STM32H5_ADC2_TIMTRIG,
+  .trigger     = CONFIG_STM32_ADC2_TIMTRIG,
   .tbase       = ADC2_TIMER_BASE,
   .trcc_enr    = ADC2_TIMER_RCC_ENR,
   .trcc_en     = ADC2_TIMER_RCC_EN,
   .extsel      = ADC2_EXTSEL_VALUE,
   .pclck       = ADC2_TIMER_PCLK_FREQUENCY,
-  .freq        = CONFIG_STM32H5_ADC2_SAMPLE_FREQUENCY,
+  .freq        = CONFIG_STM32_ADC2_SAMPLE_FREQUENCY,
 #endif
 
 #ifdef BOARD_ADC2_DIFSEL
@@ -435,8 +435,8 @@ static struct stm32_dev_s g_adcpriv2 =
   .hasdma       = true,
   .r_chanbuffer = g_adc2_chanbuffer,
   .r_dmabuffer  = g_adc2_dmabuffer,
-  .dmabatch     = CONFIG_STM32H5_ADC2_DMA_BATCH,
-#  ifdef CONFIG_STM32H5_ADC2_DMA_CFG
+  .dmabatch     = CONFIG_STM32_ADC2_DMA_BATCH,
+#  ifdef CONFIG_STM32_ADC2_DMA_CFG
   .circular     = true,
 #  else
   .circular     = false,
@@ -447,25 +447,25 @@ static struct stm32_dev_s g_adcpriv2 =
 
 #ifdef ADC2_HAVE_OVERSAMPLE
   .oversample = true,
-#  ifdef CONFIG_STM32H5_ADC2_TROVS
+#  ifdef CONFIG_STM32_ADC2_TROVS
   .trovs = true,
 #  else
   .trovs = false,
 #  endif
-  .ovsr = CONFIG_STM32H5_ADC2_OVSR,
-  .ovss = CONFIG_STM32H5_ADC2_OVSS,
+  .ovsr = CONFIG_STM32_ADC2_OVSR,
+  .ovss = CONFIG_STM32_ADC2_OVSS,
 #else
   .oversample = false,
 #endif
 
-#ifdef CONFIG_STM32H5_ADC2_WDG1
+#ifdef CONFIG_STM32_ADC2_WDG1
   .wdg1_enable = true,
-  .wdg1_flt = CONFIG_STM32H5_ADC2_WDG1_FLT,
-  .wdg1_low_thresh = CONFIG_STM32H5_ADC2_WDG1_LOWTHRESH,
-  .wdg1_high_thresh = CONFIG_STM32H5_ADC2_WDG1_HIGHTHRESH,
-#  ifdef CONFIG_STM32H5_ADC2_WDG1_SGL
+  .wdg1_flt = CONFIG_STM32_ADC2_WDG1_FLT,
+  .wdg1_low_thresh = CONFIG_STM32_ADC2_WDG1_LOWTHRESH,
+  .wdg1_high_thresh = CONFIG_STM32_ADC2_WDG1_HIGHTHRESH,
+#  ifdef CONFIG_STM32_ADC2_WDG1_SGL
   .wdg1_single_chan = true,
-  .wdg1_chan = CONFIG_STM32H5_ADC2_WDG1_CHAN,
+  .wdg1_chan = CONFIG_STM32_ADC2_WDG1_CHAN,
 #  else
   .wdg1_single_chan = false,
   .wdg1_chan = 0,
@@ -1069,7 +1069,10 @@ static void adc_oversample(struct adc_dev_s *dev)
                      (priv->ovsr << ADC_CFGR2_OVSR_SHIFT) |
                      (priv->ovss << ADC_CFGR2_OVSS_SHIFT);
 
-  setbits |= priv->trovs;
+  if (priv->trovs)
+    {
+      setbits |= ADC_CFGR2_TROVS;
+    }
 
   adc_modifyreg(priv, STM32_ADC_CFGR2_OFFSET, clrbits, setbits);
 }
@@ -1406,7 +1409,7 @@ static int adc_setup(struct adc_dev_s *dev)
    * ADC1 and ADC2 are enabled.)
    */
 
-#if defined(CONFIG_STM32H5_ADC1) && defined(CONFIG_STM32H5_ADC2)
+#if defined(CONFIG_STM32_ADC1) && defined(CONFIG_STM32_ADC2)
   if ((dev == &g_adcdev1 &&
       !((struct stm32_dev_s *)g_adcdev2.ad_priv)->initialized) ||
      (dev == &g_adcdev2 &&
@@ -1684,7 +1687,7 @@ static int adc_set_ch(struct adc_dev_s *dev, uint8_t ch)
       priv->rnchannels = 1;
     }
 
-  DEBUGASSERT(priv->rnchannels <= CONFIG_STM32H5_ADC_MAX_SAMPLES);
+  DEBUGASSERT(priv->rnchannels <= CONFIG_STM32_ADC_MAX_SAMPLES);
 
   bits = adc_sqrbits(priv, ADC_SQR4_FIRST, ADC_SQR4_LAST,
                      ADC_SQR4_SQ_OFFSET);
@@ -1779,6 +1782,7 @@ static int adc_ioctl(struct adc_dev_s *dev, int cmd, unsigned long arg)
     {
       case ANIOC_TRIGGER:
         {
+          priv->current = 0;
           adc_startconv(priv, true);
         }
         break;
@@ -1811,7 +1815,8 @@ static int adc_ioctl(struct adc_dev_s *dev, int cmd, unsigned long arg)
 
           /* Set the watchdog threshold register */
 
-          regval = ((arg << ADC_TR1_HT1_SHIFT) & ADC_TR1_HT1_MASK);
+          regval &= ~ADC_TR1_HT1_MASK;
+          regval |= ((arg << ADC_TR1_HT1_SHIFT) & ADC_TR1_HT1_MASK);
           adc_putreg(priv, STM32_ADC_TR1_OFFSET, regval);
 
           /* Ensure analog watchdog is enabled */
@@ -1845,7 +1850,8 @@ static int adc_ioctl(struct adc_dev_s *dev, int cmd, unsigned long arg)
 
           /* Set the watchdog threshold register */
 
-          regval = ((arg << ADC_TR1_LT1_SHIFT) & ADC_TR1_LT1_MASK);
+          regval &= ~ADC_TR1_LT1_MASK;
+          regval |= ((arg << ADC_TR1_LT1_SHIFT) & ADC_TR1_LT1_MASK);
           adc_putreg(priv, STM32_ADC_TR1_OFFSET, regval);
 
           /* Ensure analog watchdog is enabled */
@@ -2027,13 +2033,13 @@ static int adc_interrupt(struct adc_dev_s *dev, uint32_t adcisr)
  *
  ****************************************************************************/
 
-#if defined(CONFIG_STM32H5_ADC1) || defined(CONFIG_STM32H5_ADC2)
+#if defined(CONFIG_STM32_ADC1) || defined(CONFIG_STM32_ADC2)
 static int adc12_interrupt(int irq, void *context, void *arg)
 {
   uint32_t regval;
   uint32_t pending;
 
-#ifdef CONFIG_STM32H5_ADC1
+#ifdef CONFIG_STM32_ADC1
   regval  = getreg32(STM32_ADC1_ISR);
   pending = regval & ADC_INT_MASK;
   if (pending != 0)
@@ -2042,7 +2048,7 @@ static int adc12_interrupt(int irq, void *context, void *arg)
     }
 #endif
 
-#ifdef CONFIG_STM32H5_ADC2
+#ifdef CONFIG_STM32_ADC2
   regval  = getreg32(STM32_ADC2_ISR);
   pending = regval & ADC_INT_MASK;
   if (pending != 0)
@@ -2579,12 +2585,11 @@ static int adc_timinit(struct stm32_dev_s *priv)
  ****************************************************************************/
 
 /****************************************************************************
- * Name: stm32h5_adc_initialize
+ * Name: stm32_adc_initialize
  ****************************************************************************/
 
-struct adc_dev_s *stm32h5_adc_initialize(int intf,
-                                         const uint8_t *chanlist,
-                                         int cchannels)
+struct adc_dev_s *stm32_adc_initialize(int intf, const uint8_t *chanlist,
+                                       int cchannels)
 {
   struct adc_dev_s *dev;
   struct stm32_dev_s *priv;
@@ -2593,13 +2598,13 @@ struct adc_dev_s *stm32h5_adc_initialize(int intf,
 
   switch (intf)
     {
-#ifdef CONFIG_STM32H5_ADC1
+#ifdef CONFIG_STM32_ADC1
       case 1:
         ainfo("ADC1 selected\n");
         dev = &g_adcdev1;
         break;
 #endif
-#ifdef CONFIG_STM32H5_ADC2
+#ifdef CONFIG_STM32_ADC2
       case 2:
         ainfo("ADC2 selected\n");
         dev = &g_adcdev2;
@@ -2615,10 +2620,10 @@ struct adc_dev_s *stm32h5_adc_initialize(int intf,
   priv = (struct stm32_dev_s *)dev->ad_priv;
   priv->cb = NULL;
 
-  DEBUGASSERT(cchannels <= CONFIG_STM32H5_ADC_MAX_SAMPLES);
-  if (cchannels > CONFIG_STM32H5_ADC_MAX_SAMPLES)
+  DEBUGASSERT(cchannels <= CONFIG_STM32_ADC_MAX_SAMPLES);
+  if (cchannels > CONFIG_STM32_ADC_MAX_SAMPLES)
     {
-      cchannels = CONFIG_STM32H5_ADC_MAX_SAMPLES;
+      cchannels = CONFIG_STM32_ADC_MAX_SAMPLES;
     }
 
   priv->cchannels = cchannels;
@@ -2634,6 +2639,5 @@ struct adc_dev_s *stm32h5_adc_initialize(int intf,
 
   return dev;
 }
-#endif /* CONFIG_STM32H5_ADC1 || CONFIG_STM32H5_ADC2 */
+#endif /* CONFIG_STM32_ADC1 || CONFIG_STM32_ADC2 */
 #endif /* CONFIG_ADC */
-

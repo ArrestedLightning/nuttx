@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <sched.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/addrenv.h>
 #include <nuttx/irq.h>
@@ -128,6 +128,7 @@ uint64_t *arm64_doirq(int irq, uint64_t * regs)
        */
 
       addrenv_switch(tcb);
+      tcb = this_task();
 #endif
 
       /* Update scheduler parameters */

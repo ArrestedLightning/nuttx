@@ -33,7 +33,8 @@
 #include <stdio.h>
 #include <syslog.h>
 #include <errno.h>
-#include <debug.h>
+
+#include <nuttx/debug.h>
 #include <nuttx/signal.h>
 
 #ifdef CONFIG_USBMONITOR
@@ -233,7 +234,7 @@ int sam_bringup(void)
 #ifdef HAVE_LED_DRIVER
   /* Register the LED driver */
 
-  ret = userled_lower_initialize(LED_DRIVER_PATH);
+  ret = userled_lower_initialize("/dev/userleds");
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: userled_lower_initialize() failed: %d\n",

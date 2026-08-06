@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include <sched.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/addrenv.h>
 #include <nuttx/arch.h>
@@ -79,8 +79,8 @@ size_t tricore_stack_check(uintptr_t alloc, size_t size)
 
   /* Get aligned addresses of the top and bottom of the stack */
 
-  start = STACK_ALIGN_UP((uintptr_t)alloc);
-  end   = STACK_ALIGN_DOWN((uintptr_t)alloc + size);
+  start = STACKFRAME_ALIGN_UP((uintptr_t)alloc);
+  end   = STACKFRAME_ALIGN_DOWN((uintptr_t)alloc + size);
 
   /* Get the adjusted size based on the top and bottom of the stack */
 
@@ -93,7 +93,7 @@ size_t tricore_stack_check(uintptr_t alloc, size_t size)
    */
 
   for (ptr = (uint32_t *)start, mark = (size >> 2);
-       *ptr == STACK_COLOR && mark > 0;
+       mark > 0 && *ptr == STACK_COLOR;
        ptr++, mark--);
 
   /* Return our guess about how much stack space was used */

@@ -80,13 +80,12 @@
 #include <stdbool.h>
 #include <sys/types.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <string.h>
 #include <inttypes.h>
 
 #include <nuttx/eeprom/eeprom.h>
-#include <nuttx/eeprom/i2c_xx24xx.h>
 #include <nuttx/fs/fs.h>
 #include <nuttx/i2c/i2c_master.h>
 #include <nuttx/kmalloc.h>
@@ -95,10 +94,6 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-#ifndef CONFIG_EE24XX_FREQUENCY
-#  define CONFIG_EE24XX_FREQUENCY 100000
-#endif
 
 #define UUID_SIZE   16
 
@@ -124,23 +119,23 @@ struct ee24xx_dev_s
 {
   /* Bus management */
 
-  FAR struct i2c_master_s *i2c;      /* I2C device where the EEPROM is attached */
-  uint32_t                 freq;     /* I2C bus speed */
-  uint8_t                  addr;     /* 7-bit unshifted I2C device address */
+  FAR struct i2c_master_s *i2c;  /* I2C device where the EEPROM is attached */
+  uint32_t                 freq; /* I2C bus speed                           */
+  uint8_t                  addr; /* 7-bit unshifted I2C device address      */
 
   /* Driver management */
 
-  mutex_t                  lock;     /* file write access serialization */
-  uint8_t                  refs;     /* Nr of times the device has been opened */
-  bool                     readonly; /* Flags */
+  mutex_t lock;     /* file write access serialization                      */
+  uint8_t refs;     /* Nr of times the device has been opened               */
+  bool    readonly; /* Flags                                                */
 
   /* Expanded from geometry */
 
-  uint32_t                 size;       /* total bytes in device */
-  uint16_t                 pgsize;     /* write block size, in bytes */
-  uint16_t                 addrlen;    /* number of bytes in data addresses */
-  uint16_t                 haddrbits;  /* Number of bits in high address part */
-  uint16_t                 haddrshift; /* bit-shift of high address part */
+  uint32_t size;       /* total bytes in device                             */
+  uint16_t pgsize;     /* write block size, in bytes                        */
+  uint16_t addrlen;    /* number of bytes in data addresses                 */
+  uint16_t haddrbits;  /* Number of bits in high address part               */
+  uint16_t haddrshift; /* bit-shift of high address part                    */
 };
 
 /****************************************************************************
@@ -168,7 +163,7 @@ static ssize_t at24cs_read_uuid(FAR struct file *filep, FAR char *buffer,
 
 /* Supported device geometries.
  * One geometry can fit more than one device.
- * The user will use an enum'ed index from include/eeprom/i2c_xx24xx.h
+ * The user will use an enum'ed index from include/eeprom/eeprom.h
  */
 
 static const struct ee24xx_geom_s g_ee24xx_devices[] =
@@ -332,6 +327,147 @@ static int ee24xx_writepage(FAR struct ee24xx_dev_s *eedev, uint32_t memaddr,
 }
 
 /****************************************************************************
+ * Name: ee24xx_eraseall
+ *
+ * Description:
+ *   Erase all data on the device
+ *
+ * Input Parameters:
+ *   eedev - Device structure
+ *
+ ****************************************************************************/
+
+static int ee24xx_eraseall(FAR struct ee24xx_dev_s *eedev)
+{
+  FAR char *buf;
+  off_t     offset;
+  int       ret;
+
+  DEBUGASSERT(eedev);
+
+  if (eedev->readonly)
+    {
+      return -EACCES;
+    }
+
+  buf = kmm_malloc(eedev->pgsize);
+  if (buf == NULL)
+    {
+      ferr("ERROR: Failed to allocate memory for ee24xx eraseall\n");
+      return -ENOMEM;
+    }
+
+  memset(buf, 0xff, eedev->pgsize);
+
+  ret = nxmutex_lock(&eedev->lock);
+  if (ret < 0)
+    {
+      goto free_buffer;
+    }
+
+  for (offset = 0; offset < eedev->size; offset += eedev->pgsize)
+    {
+      ret = ee24xx_writepage(eedev, offset, buf, eedev->pgsize);
+      if (ret < 0)
+        {
+          ferr("ERROR: Failed to write page at offset %" PRIdOFF
+               " (ret = %d)",
+               offset, ret);
+          goto release_semaphore;
+        }
+
+      ret = ee24xx_waitwritecomplete(eedev, offset);
+      if (ret < 0)
+        {
+          ferr("ERROR while waiting for write at offset %" PRIdOFF
+               " to complete (ret = %d)",
+               offset, ret);
+          goto release_semaphore;
+        }
+    }
+
+release_semaphore:
+  nxmutex_unlock(&eedev->lock);
+
+free_buffer:
+  kmm_free(buf);
+  return ret;
+}
+
+/****************************************************************************
+ * Name: ee24xx_erasepage
+ *
+ * Description:
+ *   Erase 1 page of data
+ *
+ * Input Parameters:
+ *   eedev - Device structure
+ *   index - Index of the page to erase
+ *
+ * Returned Value:
+ *   Zero (OK) on success; a negated errno value on failure.
+ *
+ ****************************************************************************/
+
+static int ee24xx_erasepage(FAR struct ee24xx_dev_s *eedev,
+                            unsigned long index)
+{
+  FAR char *buf;
+  int       ret;
+  off_t     offset;
+
+  DEBUGASSERT(eedev);
+  DEBUGASSERT(eedev->pgsize > 0);
+
+  if (eedev->readonly)
+    {
+      return -EACCES;
+    }
+
+  if (index >= (eedev->size / eedev->pgsize))
+    {
+      return -EFBIG;
+    }
+
+  buf = kmm_malloc(eedev->pgsize);
+
+  if (buf == NULL)
+    {
+      ferr("ERROR: Failed to allocate memory for ee24xx_erasepage\n");
+      return -ENOMEM;
+    }
+
+  memset(buf, 0xff, eedev->pgsize);
+
+  ret = nxmutex_lock(&eedev->lock);
+  if (ret < 0)
+    {
+      goto free_buffer;
+    }
+
+  offset = index * eedev->pgsize;
+  ret    = ee24xx_writepage(eedev, offset, buf, eedev->pgsize);
+  if (ret < 0)
+    {
+      ferr("ERROR: Failed to write page (ret = %d)", ret);
+      goto release_semaphore;
+    }
+
+  ret = ee24xx_waitwritecomplete(eedev, offset);
+  if (ret < 0)
+    {
+      ferr("ERROR while waiting for write to complete (ret = %d)", ret);
+    }
+
+release_semaphore:
+  nxmutex_unlock(&eedev->lock);
+
+free_buffer:
+  kmm_free(buf);
+  return ret;
+}
+
+/****************************************************************************
  * Driver Functions
  ****************************************************************************/
 
@@ -434,20 +570,35 @@ static off_t ee24xx_seek(FAR struct file *filep, off_t offset, int whence)
       return ret;
     }
 
-  /* Determine the new, requested file position */
+  /* Determine the new, requested file position
+   * For EEPROM sparse files are not allowed.
+   * "offset" can be negative, "newpos" must be between 0 and eedev->size
+   */
 
   switch (whence)
     {
     case SEEK_CUR:
       newpos = filep->f_pos + offset;
+      if (newpos < 0 || newpos > eedev->size)
+        {
+          return -EINVAL;
+        }
       break;
 
     case SEEK_SET:
       newpos = offset;
+      if (newpos < 0 || newpos > eedev->size)
+        {
+          return -EINVAL;
+        }
       break;
 
     case SEEK_END:
       newpos = eedev->size + offset;
+      if (newpos < 0 || newpos > eedev->size)
+        {
+          return -EINVAL;
+        }
       break;
 
     default:
@@ -806,6 +957,28 @@ static int ee24xx_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
             }
         }
         break;
+
+      case EEPIOC_SETSPEED:
+        {
+          ret = nxmutex_lock(&eedev->lock);
+          if (ret == OK)
+          {
+            eedev->freq = (uint32_t)arg;
+            nxmutex_unlock(&eedev->lock);
+          }
+        }
+        break;
+
+      case EEPIOC_PAGEERASE:
+      case EEPIOC_SECTORERASE:
+        ret = ee24xx_erasepage(eedev, arg);
+        break;
+
+      case EEPIOC_CHIPERASE:
+        ret = ee24xx_eraseall(eedev);
+        break;
+
+      /* TODO: add "case EEPIOC_BLOCKPROTECT:" */
 
       default:
         ret = -ENOTTY;

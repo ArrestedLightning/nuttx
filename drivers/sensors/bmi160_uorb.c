@@ -36,6 +36,12 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* Only float data type supported now */
+
+#ifdef CONFIG_SENSORS_USE_B16
+#  error fixed-point data type not supported yet
+#endif
+
 #define BMI160_DEFAULT_INTERVAL 10000  /* Default conversion interval. */
 
 /****************************************************************************
@@ -465,7 +471,7 @@ static int bmi160_accel_activate(FAR struct sensor_lowerhalf_s *lower,
 static void bmi160_accel_worker(FAR void *arg)
 {
   FAR struct bmi160_dev_uorb_s *priv = arg;
-  struct sensor_accel accel;
+  struct sensor_accel_uncal accel;
   struct accel_t p;
   uint32_t time;
 
@@ -512,7 +518,7 @@ static void bmi160_accel_worker(FAR void *arg)
 static void bmi160_gyro_worker(FAR void *arg)
 {
   FAR struct bmi160_dev_uorb_s *priv = arg;
-  struct sensor_gyro gyro;
+  struct sensor_gyro_uncal gyro;
   struct gyro_t p;
   uint32_t time;
 

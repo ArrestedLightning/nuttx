@@ -22,11 +22,8 @@
 
 CSRCS = esp32s3_boot.c esp32s3_bringup.c
 
-ifeq ($(CONFIG_BOARDCTL),y)
-CSRCS += esp32s3_appinit.c
 ifeq ($(CONFIG_BOARDCTL_RESET),y)
 CSRCS += esp32s3_reset.c
-endif
 endif
 
 ifeq ($(CONFIG_ESP32S3_SPI),y)
@@ -51,4 +48,16 @@ endif
 
 ifeq ($(CONFIG_INPUT_FT5X06),y)
 CSRCS += esp32s3_ft5x06.c
+endif
+
+ifeq ($(CONFIG_SENSORS_QMI8658),y)
+CSRCS += esp32s3_qmi8658.c
+endif
+
+ifeq ($(CONFIG_ESP32S3_CAM),y)
+CSRCS += esp32s3_board_camera.c
+endif
+
+ifeq ($(CONFIG_AUDIO_ES7210),y)
+CSRCS += esp32s3_board_es7210.c
 endif

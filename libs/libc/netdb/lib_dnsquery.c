@@ -44,7 +44,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <assert.h>
 
 #include <arpa/inet.h>
@@ -691,6 +691,19 @@ static int dns_recv_response(int sd, FAR union dns_addr_u *addr, int naddr,
         {
           ret = -EILSEQ;
           nwarn("Further parse returned %d\n", ret);
+          break;
+        }
+
+      /* Verify that a complete answer header (10 bytes: type, class,
+       * ttl[2], len) is available before casting to dns_answer_s.
+       * Without this check, accessing ans->ttl and ans->type/class/len
+       * would be an OOB read if fewer than 10 bytes remain.
+       */
+
+      if (nameptr + sizeof(struct dns_answer_s) > endofbuffer)
+        {
+          ret = -EILSEQ;
+          nwarn("DNS answer header truncated\n");
           break;
         }
 

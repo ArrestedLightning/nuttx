@@ -33,7 +33,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <inttypes.h>
-#include <debug.h>
+
+#include <nuttx/debug.h>
 #include <nuttx/mutex.h>
 
 #include "riscv_internal.h"
@@ -247,6 +248,7 @@ int esp_sha1_update(struct esp_sha1_context_s *ctx,
           return ret;
         }
 
+      sha_hal_set_mode(ctx->mode);
       if (ctx->sha_state == ESP_SHA_STATE_INIT)
         {
           ctx->first_block = true;
@@ -471,6 +473,7 @@ int esp_sha256_update(struct esp_sha256_context_s *ctx,
           return ret;
         }
 
+      sha_hal_set_mode(ctx->mode);
       if (ctx->sha_state == ESP_SHA_STATE_INIT)
         {
           ctx->first_block = true;

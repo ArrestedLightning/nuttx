@@ -6,7 +6,7 @@ EEPROM
 
    This page describes EEPROM interfacing using a character driver. For the
    more standard MTD interface, refer to the
-   :doc:`MTD documentation <../special/mtd>`.
+   :doc:`MTD documentation <../special/mtd/index>`.
    See `MTD vs character driver <mtd_vs_char_>`_ for when to use each interface.
 
 EEPROMs are a form of Memory Technology Device (MTD).
@@ -155,7 +155,45 @@ IOCTL Commands
 The full list of ``ioctl()`` commands can be found in
 ``include/nuttx/eeprom/eeprom.h``.
 
--  ``EEPIOC_GEOMETRY``: Get the EEPROM geometry
+- ``EEPIOC_GEOMETRY``
+    *Argument:* ``struct eeprom_geometry_s *``
+
+    Get the EEPROM geometry
+
+- ``EEPIOC_SETSPEED``
+    *Argument:* ``uint32_t``
+
+    Set the SPI/I2C bus frequency
+
+- ``EEPIOC_PAGEERASE``
+    *Argument:* ``unsigned long``
+
+    Erase an EEPROM page given its index, a dedicated command is used if
+    supported by the device.
+
+- ``EEPIOC_SECTORERASE``
+    *Argument:* ``unsigned long``
+
+    Erase an EEPROM sector given its index, a dedicated command is used if
+    supported by the device. Equivalent to a page erase on devices without
+    sectors.
+
+- ``EEPIOC_CHIPERASE``
+    *Argument:* ``void``
+
+    Erase the full EEPROM, a dedicated command is used if supported by the
+    device.
+
+- ``EEPIOC_BLOCKPROTECT``
+    *Argument:* ``uint8_t``
+
+    Set EEPROM's Block Protect bits. For 25AA160-compatible EEPROM with
+    two Block Protect bits in Status Register, the argument may be:
+
+    - ``0`` for no write protect,
+    - ``1`` to set Block Protection 0 bit of Status Register,
+    - ``2`` to set Block Protection 1 bit of Status Register,
+    - ``3`` to set both Block Protection bits 0 and 1.
 
 File Systems
 ============
@@ -166,4 +204,4 @@ because you can open and access the EEPROM part as if it were a single,
 fixed size file.
 
 To use them with a file system, it is preferable to use the
-:doc:`MTD driver <../special/mtd>`.
+:doc:`MTD driver <../special/mtd/index>`.
