@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/arm/src/stmf0l0g0/stm32g0_usbfs.c
+ * arch/arm/src/stm32f0l0g0/stm32g0_usbfs.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -335,7 +335,8 @@ struct stm32_usbdev_s
 
   struct usb_ctrlreq_s   ctrl;          /* Last EP0 request */
 
-  uint8_t                ep0data[CONFIG_USBDEV_SETUP_MAXDATASIZE] aligned_data(4);
+  uint8_t                ep0data[CONFIG_USBDEV_SETUP_MAXDATASIZE]
+                         aligned_data(4);
   uint16_t               ep0datlen;
 
   /* The endpoint list */
@@ -1120,7 +1121,7 @@ stm32_copyfrompma(uint8_t *buffer, uint16_t pma, uint16_t nbytes)
   int     nwords = (nbytes + 3) >> 2;
   int     i;
   uint32_t temp;
-  uint8_t *temp_ptr = (uint8_t*) &temp;
+  uint8_t *temp_ptr = (uint8_t *) &temp;
 
   /* Copy loop.  Source=packet memory, Dest=user buffer */
 
@@ -1129,14 +1130,11 @@ stm32_copyfrompma(uint8_t *buffer, uint16_t pma, uint16_t nbytes)
     {
       /* Copy 32 bits from packet memory to user buffer.
        * Since buffer cannot be guaranteed to be word-aligned,
-       * this must be done byte-by-byte on the Cortex M0+. */
-      temp = *src++;
+        * this must be done byte-by-byte on the Cortex M0+.
+        *
+        */
 
-//      buffer[0] = (uint8_t)(temp & 0xff);
-//      buffer[1] = (uint8_t)((temp >> 8) & 0xff);
-//      buffer[2] = (uint8_t)((temp >> 16) & 0xff);
-//      buffer[3] = (uint8_t)((temp >> 24) & 0xff);
-
+      temp      = *src++;
       buffer[0] = temp_ptr[0];
       buffer[1] = temp_ptr[1];
       buffer[2] = temp_ptr[2];
@@ -3707,6 +3705,7 @@ static void stm32_hwshutdown(struct stm32_usbdev_s *priv)
   stm32_putreg(USB_CNTR_FRES | USB_CNTR_PDWN, STM32_USB_CNTR);
 
   /* Turn off USB VCC */
+
   stm32_pwr_enableusv(false);
 }
 
@@ -3749,7 +3748,6 @@ void arm_usbinitialize(void)
   regval  = getreg32(STM32_RCC_APB1RSTR);
   regval &= ~RCC_APB1RSTR_USBRST;
   putreg32(regval, STM32_RCC_APB1RSTR);
-
 
   /* Power up the USB controller, but leave it in the reset state */
 

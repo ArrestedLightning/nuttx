@@ -218,7 +218,6 @@ void stm32_pwr_disablepvd(void);
 
 #endif /* CONFIG_STM32F0L0G0_ENERGYLITE */
 
-
 #undef EXTERN
 #if defined(__cplusplus)
 }

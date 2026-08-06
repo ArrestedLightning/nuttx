@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/arm/src/stmf0l0g0/hardware/stm32g0_usbfs.h
+ * arch/arm/src/stm32f0l0g0/hardware/stm32g0_usbfs.h
  *
  * SPDX-License-Identifier: Apache-2.0
  *
