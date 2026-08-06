@@ -142,7 +142,6 @@ struct up_dev_s
   const uint32_t    baud;      /* Configured baud */
 #endif
 
-  const uint8_t     rxftcfg;   /* Rx FIFO threshold level */
   const uint8_t     irq;       /* IRQ associated with this USART */
   const uint32_t    apbclock;  /* PCLK 1 or 2 frequency */
   const uint32_t    usartbase; /* Base address of USART registers */
