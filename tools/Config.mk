@@ -457,6 +457,10 @@ define ARCHIVE
 	$(AR) $1  $2
 endef
 
+define ARCHIVE_ADD
+	$(call ARCHIVE,$1,$2)
+endef
+
 # PRELINK - Prelink a list of files
 # This is useful when files were compiled with fvisibility=hidden.
 # Any symbol which was not explicitly made global is invisible outside the

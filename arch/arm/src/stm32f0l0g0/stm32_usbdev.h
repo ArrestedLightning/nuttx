@@ -32,7 +32,6 @@
 #include <stdint.h>
 
 #include "chip.h"
-#include "hardware/stm32_usbdev.h"
 
 /****************************************************************************
  * Public Functions Prototypes

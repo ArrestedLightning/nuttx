@@ -35,6 +35,7 @@
 
 #include "arm_internal.h"
 #include "stm32_pwr.h"
+#include "stm32_rcc.h"
 
 #if defined(CONFIG_STM32F0L0G0_PWR)
 
@@ -94,3 +95,43 @@ void stm32_pwr_setvos(uint16_t vos)
 /* TODO Other stm32_pwr_* functions need to be implemented */
 
 #endif /* CONFIG_STM32F0L0G0_PWR */
+
+/****************************************************************************
+ * Name: stm32_pwr_enableusv
+ *
+ * Description:
+ *   Enables or disables the USB Supply.  Setting this bit
+ *   is mandatory to use the USB OTG FS peripheral.
+ *
+ * Input Parameters:
+ *   set - True: Vddusb is enabled; False: Vddusb is disabled.
+ *
+ ****************************************************************************/
+
+void stm32_pwr_enableusv(bool set)
+{
+  uint32_t regval;
+  bool was_clk_enabled;
+
+  regval = getreg32(STM32_RCC_APB1ENR);
+  was_clk_enabled = ((regval & RCC_APB1ENR_PWREN) != 0);
+
+  if (!was_clk_enabled)
+    {
+      modifyreg32(STM32_RCC_APB1ENR, 0, RCC_APB1ENR_PWREN);
+    }
+
+  if (set)
+    {
+      modifyreg32(STM32_PWR_CR2, 0, PWR_CR2_USV);
+    }
+  else
+    {
+      modifyreg32(STM32_PWR_CR2, PWR_CR2_USV, 0);
+    }
+
+  if (!was_clk_enabled)
+    {
+      modifyreg32(STM32_RCC_APB1ENR, RCC_APB1ENR_PWREN, 0);
+    }
+}

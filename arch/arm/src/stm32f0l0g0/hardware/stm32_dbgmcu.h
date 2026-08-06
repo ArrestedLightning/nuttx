@@ -58,7 +58,7 @@
 
 /* Debug MCU APB freeze register 1 */
 
-#ifdef CONFIG_ARCH_CHIP_STM32C0
+#if defined(CONFIG_ARCH_CHIP_STM32C0) || defined(CONFIG_ARCH_CHIP_STM32G0)
 #  define DBGMCU_APB1_TIM2STOP    (1 << 0)   /* Bit 0: TIM2 stopped when core is halted */
 #  define DBGMCU_APB1_TIM3STOP    (1 << 1)   /* Bit 1: TIM3 stopped when core is halted */
 #  define DBGMCU_APB1_RTCSTOP     (1 << 10)  /* Bit 10: RTC stopped when core is halted */
@@ -69,7 +69,7 @@
 
 /* Debug MCU APB freeze register 2 */
 
-#ifdef CONFIG_ARCH_CHIP_STM32C0
+#if defined(CONFIG_ARCH_CHIP_STM32C0) || defined(CONFIG_ARCH_CHIP_STM32G0)
 #  define DBGMCU_APB1_TIM1STOP    (1 << 11)   /* Bit 1: TIM1 stopped when core is halted */
 #  define DBGMCU_APB1_TIM14STOP   (1 << 15)   /* Bit 15: TIM14 stopped when core is halted */
 #  define DBGMCU_APB1_TIM15STOP   (1 << 16)   /* Bit 16: TIM15 stopped when core is halted */

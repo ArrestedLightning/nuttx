@@ -70,6 +70,7 @@
 #  define STM32_IRQ_UCPD12     (STM32_IRQ_EXTINT + 8)  /* 8: UCPD1_2 */
 #  define STM32_IRQ_EXTI32_33  (STM32_IRQ_EXTINT + 8)  /* 8: EXTI_32_33 */
 #endif
+#define STM32_IRQ_USB          (STM32_IRQ_EXTINT + 8)  /* 8: USB */
 
 #define STM32_IRQ_DMA1CH1      (STM32_IRQ_EXTINT + 9)  /* 9: DMA1_CH1 */
 #define STM32_IRQ_DMA1CH2      (STM32_IRQ_EXTINT + 10) /* 10: DMA1_CH2 */

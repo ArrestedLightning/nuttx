@@ -43,15 +43,27 @@
  ****************************************************************************/
 
 #ifdef CONFIG_STM32F0L0G0_RNG
+# ifdef CONFIG_ARCH_CHIP_STM32G0
+#  ifndef STM32_USE_HSI48
+#    error RNG requires HSI48 enabled
+#  endif
+# else
 #  ifndef STM32_USE_CLK48
 #    error RNG requires CLK48 enabled
 #  endif
 #endif
+#endif
 
 #ifdef CONFIG_STM32F0L0G0_USB
+# ifdef CONFIG_ARCH_CHIP_STM32G0
+#  ifndef STM32_USE_HSI48
+#    error USB requires HSI48 enabled
+#  endif
+# else
 #  ifndef STM32_USE_CLK48
 #    error USB requires CLK48 enabled
 #  endif
+#endif
 #endif
 
 /* Allow up to 100 milliseconds for the high speed clock to become ready.
