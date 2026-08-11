@@ -2,7 +2,7 @@
 
 This trace follows the `nucleo-f072rb:usb-cdc-uart` configuration. The
 USART2/ST-Link console remains the NSH and syslog channel. CDC ACM is a
-separate USB device registered on demand by `two_g_usb_diagnostics start`.
+separate USB device registered during board late initialization.
 
 ## Reset To Controller Setup
 
@@ -34,21 +34,28 @@ separate USB device registered on demand by `two_g_usb_diagnostics start`.
 
 ## CDC Class Registration
 
-6. [external/TwoGUsbDiag/2g-usb-diagnostics/2g_usb_diagnostics_main.c](../../../../../../../apps/external/TwoGUsbDiag/2g-usb-diagnostics/2g_usb_diagnostics_main.c)
-    - `two_g_usb_diagnostics start` enables USB trace events and requests
-       `BOARDIOC_USBDEV_CONNECT` for CDC ACM instance 0.
-    - `two_g_usb_diagnostics stop` requests `BOARDIOC_USBDEV_DISCONNECT`; the
-       `dump` and `clear` actions consume the trace ring from the UART NSH
-       console.
+6. [boards/arm/stm32f0/nucleo-f072rb/src/stm32_bringup.c](../../src/stm32_bringup.c)
+    - `stm32_bringup()` calls `cdcacm_initialize(0, NULL)`, registering CDC
+       ACM and attaching D+ during board late initialization.
 
-7. [drivers/usbdev/cdcacm.c](../../../../../../drivers/usbdev/cdcacm.c)
-   - `cdcacm_initialize()` creates the standalone CDC ACM class object with
-     `cdcacm_classobject()`.
-   - Calls `usbdev_register(drvr)`.
-   - `cdcacm_bind()` is the class callback invoked by the controller. It
-     allocates EP0 requests and reserves the CDC endpoints.
+7. [external/TwoGUsbDiag/2g-usb-diagnostics/2g_usb_diagnostics_main.c](../../../../../../../apps/external/TwoGUsbDiag/2g-usb-diagnostics/2g_usb_diagnostics_main.c)
+    - `two_g_usb_diagnostics arm` clears and enables the trace ring without
+       changing the CDC connection.
+    - `two_g_usb_diagnostics stop` clears D+ to detach from the host while
+       retaining the registered CDC class and `/dev/ttyACM0`.
+    - `start` re-arms tracing and reattaches D+ when needed. `reconnect`
+       detaches D+ for 250 ms and reattaches it to trigger enumeration.
+    - `status` reports the CDC node, D+ state, trace state, and last action
+       without consuming trace records.
 
-8. [arch/arm/src/common/stm32/stm32_usbdev_m0_v1.c](../../../../../../arch/arm/src/common/stm32/stm32_usbdev_m0_v1.c)
+8. [drivers/usbdev/cdcacm.c](../../../../../../drivers/usbdev/cdcacm.c)
+
+    - `cdcacm_initialize()` creates the standalone CDC ACM class object with
+       `cdcacm_classobject()` and calls `usbdev_register(drvr)`.
+    - `cdcacm_bind()` is the class callback invoked by the controller. It
+       allocates EP0 requests and reserves the CDC endpoints.
+
+9. [arch/arm/src/common/stm32/stm32_usbdev_m0_v1.c](../../../../../../arch/arm/src/common/stm32/stm32_usbdev_m0_v1.c)
    - `usbdev_register()` stores `priv->driver`.
    - `CLASS_BIND(driver, &priv->usbdev)` invokes `cdcacm_bind()`.
    - `stm32_hwreset()` initializes EP0, clears USB status, and enables the
@@ -58,7 +65,7 @@ separate USB device registered on demand by `two_g_usb_diagnostics start`.
 
 ## Host Enumeration
 
-9. [arch/arm/src/common/stm32/stm32_usbdev_m0_v1.c](../../../../../../arch/arm/src/common/stm32/stm32_usbdev_m0_v1.c)
+10. [arch/arm/src/common/stm32/stm32_usbdev_m0_v1.c](../../../../../../arch/arm/src/common/stm32/stm32_usbdev_m0_v1.c)
     - `stm32_usb_interrupt()` is the global STM32F072 USB ISR.
     - `STM32_IRQ_USB` is external interrupt 31, represented by NuttX IRQ 47.
     - A host reset sets `USB_ISTR_RESET` and calls `stm32_reset()`.
@@ -68,7 +75,7 @@ separate USB device registered on demand by `two_g_usb_diagnostics start`.
       `stm32_dispatchrequest()` for descriptors and CDC class requests.
     - `stm32_dispatchrequest()` invokes `cdcacm_setup()` through `CLASS_SETUP`.
 
-10. [drivers/usbdev/cdcacm.c](../../../../../../drivers/usbdev/cdcacm.c)
+11. [drivers/usbdev/cdcacm.c](../../../../../../drivers/usbdev/cdcacm.c)
     - `cdcacm_setup()` serves the device, configuration, and string
       descriptors for standalone CDC ACM.
     - `SET_CONFIGURATION` calls `cdcacm_setconfig()`, which configures the

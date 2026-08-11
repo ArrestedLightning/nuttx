@@ -65,7 +65,7 @@ void stm32_boardinitialize(void)
 }
 
 #if defined(CONFIG_STM32_USB) && defined(CONFIG_USBDEV)
-int stm32_usbpullup(FAR struct usbdev_s *dev, bool enable)
+int stm32_usb_setpullup(bool enable)
 {
   irqstate_t flags;
   uint16_t regval;
@@ -86,6 +86,16 @@ int stm32_usbpullup(FAR struct usbdev_s *dev, bool enable)
   leave_critical_section(flags);
 
   return OK;
+}
+
+bool stm32_usb_pullup_enabled(void)
+{
+  return (getreg16(STM32_USB_BCDR) & USB_BCDR_DPPU) != 0;
+}
+
+int stm32_usbpullup(FAR struct usbdev_s *dev, bool enable)
+{
+  return stm32_usb_setpullup(enable);
 }
 
 void stm32_usbsuspend(FAR struct usbdev_s *dev, bool resume)

@@ -30,6 +30,7 @@
 #include <nuttx/config.h>
 
 #ifndef __ASSEMBLY__
+#  include <stdbool.h>
 #  include <stdint.h>
 #endif
 
@@ -143,6 +144,11 @@
 /* APB1 timers 1-3, 6-7, and 14-17 will receive PCLK1 */
 
 #define STM32_APB1_TIM1_CLKIN    (STM32_PCLK1_FREQUENCY)
+
+#if defined(CONFIG_STM32_USB) && defined(CONFIG_USBDEV)
+int stm32_usb_setpullup(bool enable);
+bool stm32_usb_pullup_enabled(void);
+#endif
 #define STM32_APB1_TIM2_CLKIN    (STM32_PCLK1_FREQUENCY)
 #define STM32_APB1_TIM3_CLKIN    (STM32_PCLK1_FREQUENCY)
 
