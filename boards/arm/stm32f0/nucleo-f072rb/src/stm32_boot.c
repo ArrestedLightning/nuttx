@@ -26,12 +26,18 @@
 
 #include <nuttx/config.h>
 
+#include <stdbool.h>
+
 #include <nuttx/debug.h>
 
 #include <nuttx/board.h>
+#include <nuttx/irq.h>
+#include <nuttx/usb/usbdev.h>
 #include <arch/board/board.h>
 
 #include "arm_internal.h"
+#include "hardware/stm32_usbdev.h"
+#include "stm32_usbdev.h"
 #include "nucleo-f072rb.h"
 
 /****************************************************************************
@@ -57,6 +63,35 @@ void stm32_boardinitialize(void)
   board_autoled_initialize();
 #endif
 }
+
+#if defined(CONFIG_STM32_USB) && defined(CONFIG_USBDEV)
+int stm32_usbpullup(FAR struct usbdev_s *dev, bool enable)
+{
+  irqstate_t flags;
+  uint16_t regval;
+
+  flags = enter_critical_section();
+  regval = getreg16(STM32_USB_BCDR);
+
+  if (enable)
+    {
+      regval |= USB_BCDR_DPPU;
+    }
+  else
+    {
+      regval &= ~USB_BCDR_DPPU;
+    }
+
+  putreg16(regval, STM32_USB_BCDR);
+  leave_critical_section(flags);
+
+  return OK;
+}
+
+void stm32_usbsuspend(FAR struct usbdev_s *dev, bool resume)
+{
+}
+#endif
 
 /****************************************************************************
  * Name: board_late_initialize
