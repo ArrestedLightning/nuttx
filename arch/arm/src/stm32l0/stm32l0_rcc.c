@@ -742,9 +742,11 @@ static void vrefint_enable(void)
   regval |= SYSCFG_CFGR3_ENBUFVREFINTHSI48;
 #endif
 
+  putreg32(regval, STM32_SYSCFG_CFGR3);
+
   /* Wait for VREFINT ready */
 
-  while ((getreg32(STM32_SYSCFG_CFGR3) & SYSCFG_CFGR3_VREFINTRDYF) == 0);
+  while ((getreg32(STM32_PWR_CSR) & PWR_CSR_VREFINTRDYF) == 0);
 }
 #endif
 
