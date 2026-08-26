@@ -323,6 +323,11 @@ void stm32_disable_icache(void)
   putreg32(regval, STM32_ICACHE_CR);
 }
 
+bool stm32_icache_enabled(void)
+{
+  return (getreg32(STM32_ICACHE_CR) & ICACHE_CR_EN) != 0;
+}
+
 void stm32_enable_icache(void)
 {
   uint32_t regval;
